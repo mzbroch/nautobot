@@ -5,6 +5,7 @@ from nautobot.dcim import models
 
 __all__ = [
     "NestedCableSerializer",
+    "NestedCableEndpointSerializer",
     "NestedConsolePortSerializer",
     "NestedConsolePortTemplateSerializer",
     "NestedConsoleServerPortSerializer",
@@ -328,6 +329,14 @@ class NestedCableSerializer(BaseModelSerializer):
     class Meta:
         model = models.Cable
         fields = ["id", "url", "label"]
+
+
+class NestedCableEndpointSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="dcim-api:cableendpoint-detail")
+
+    class Meta:
+        model = models.CableEndpoint
+        fields = ["id", "url"]
 
 
 #

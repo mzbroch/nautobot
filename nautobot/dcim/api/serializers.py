@@ -34,6 +34,7 @@ from nautobot.dcim.choices import (
 from nautobot.dcim.constants import CABLE_TERMINATION_MODELS, RACK_ELEVATION_LEGEND_WIDTH_DEFAULT
 from nautobot.dcim.models import (
     Cable,
+    CableEndpoint,
     CablePath,
     ConsolePort,
     ConsolePortTemplate,
@@ -88,6 +89,7 @@ from nautobot.virtualization.api.nested_serializers import NestedClusterSerializ
 # automagically replacing a Serializer with its corresponding NestedSerializer.
 from .nested_serializers import (  # noqa: F401
     NestedCableSerializer,
+    NestedCableEndpointSerializer,
     NestedConsolePortSerializer,
     NestedConsolePortTemplateSerializer,
     NestedConsoleServerPortSerializer,
@@ -1211,11 +1213,15 @@ class InventoryItemSerializer(TaggedObjectSerializer, CustomFieldModelSerializer
 # Cables
 #
 
-
+# Legacy Cable serializer
 class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, CustomFieldModelSerializer):
+    # TODO(mzb): How to handle situations with more than 2 endpoints ?
+    #  - we should redirect to newer api version?
     url = serializers.HyperlinkedIdentityField(view_name="dcim-api:cable-detail")
-    termination_a_type = ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))
-    termination_b_type = ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))
+    termination_a_type = serializers.SerializerMethodField(read_only=True)
+    # ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))
+    termination_b_type = serializers.SerializerMethodField(read_only=True)
+    # ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))
     termination_a = serializers.SerializerMethodField(read_only=True)
     termination_b = serializers.SerializerMethodField(read_only=True)
     length_unit = ChoiceField(choices=CableLengthUnitChoices, allow_blank=True, required=False)
@@ -1226,10 +1232,10 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
             "id",
             "url",
             "termination_a_type",
-            "termination_a_id",
+            # "termination_a_id",
             "termination_a",
             "termination_b_type",
-            "termination_b_id",
+            # "termination_b_id",
             "termination_b",
             "type",
             "status",
@@ -1247,9 +1253,10 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
         """
         Serialize a nested representation of a termination.
         """
-        if side.lower() not in ["a", "b"]:
+        if side.lower() not in ["a", "b", "z"]:
             raise ValueError("Termination side must be either A or B.")
-        termination = getattr(obj, "termination_{}".format(side.lower()))
+        # termination = getattr(obj, "termination_{}".format(side.lower()))
+        termination = obj.endpoints.filter(side=side).first().termination  # TODO(mzb): How do get rid of `first()`
         if termination is None:
             return None
         serializer = get_serializer_for_model(termination, prefix="Nested")
@@ -1258,13 +1265,67 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
 
         return data
 
+    def _get_termination_type(self, obj, side):
+        """
+        Serialize type of a termination.
+        """
+        if side.lower() not in ["a", "b", "z"]:
+            raise ValueError("Termination side must be either A or B.")
+        termination_type = obj.endpoints.filter(side=side).first().termination_type
+        if termination_type is None:
+            return None
+        # serializer = get_serializer_for_model(termination, prefix="Nested")
+        context = {"request": self.context["request"]}
+        # data = serializer(termination, context=context).data
+
+        return data
+
+    @swagger_serializer_method(serializer_or_field=serializers.DictField)
+    def get_termination_a_type(self, obj):
+        return self._get_termination_type(obj, "A")
+
+    @swagger_serializer_method(serializer_or_field=serializers.DictField)
+    def get_termination_b_type(self, obj):
+        return self._get_termination_type(obj, "A")
+
     @swagger_serializer_method(serializer_or_field=serializers.DictField)
     def get_termination_a(self, obj):
-        return self._get_termination(obj, "a")
+        return self._get_termination(obj, "A")
 
     @swagger_serializer_method(serializer_or_field=serializers.DictField)
     def get_termination_b(self, obj):
-        return self._get_termination(obj, "b")
+        return self._get_termination(obj, "A")
+
+
+class CableEndpointSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, CustomFieldModelSerializer):
+    # url = serializers.HyperlinkedIdentityField(view_name="dcim-api:cableendpoint-detail")
+    # termination_type = ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # -> get
+    # termination = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = CableEndpoint
+        fields = [
+            "id",
+            "url",
+            "termination_type",
+            "termination",
+            # "termination_a_type",
+            # "termination_a_id",
+            # "termination_a",
+            # "termination_b_type",
+            # "termination_b_id",
+            # "termination_b",
+            # "type",
+            # "status",
+            # "label",
+            # "color",
+            # "length",
+            # "length_unit",
+            # "tags",
+            # "custom_fields",
+            # "computed_fields",
+        ]
+        # opt_in_fields = ["computed_fields"]
 
 
 class TracedCableSerializer(StatusModelSerializerMixin, serializers.ModelSerializer):

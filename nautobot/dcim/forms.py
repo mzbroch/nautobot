@@ -3310,39 +3310,39 @@ class ConnectCableToDeviceForm(BootstrapMixin, CustomFieldModelForm):
     Base form for connecting a Cable to a Device component
     """
 
-    termination_b_region = DynamicModelChoiceField(queryset=Region.objects.all(), label="Region", required=False)
-    termination_b_site = DynamicModelChoiceField(
-        queryset=Site.objects.all(),
-        label="Site",
-        required=False,
-        query_params={"region_id": "$termination_b_region"},
-    )
-    termination_b_rack = DynamicModelChoiceField(
-        queryset=Rack.objects.all(),
-        label="Rack",
-        required=False,
-        null_option="None",
-        query_params={"site_id": "$termination_b_site"},
-    )
-    termination_b_device = DynamicModelChoiceField(
-        queryset=Device.objects.all(),
-        label="Device",
-        required=False,
-        query_params={
-            "site_id": "$termination_b_site",
-            "rack_id": "$termination_b_rack",
-        },
-    )
+    # termination_b_region = DynamicModelChoiceField(queryset=Region.objects.all(), label="Region", required=False)
+    # termination_b_site = DynamicModelChoiceField(
+    #     queryset=Site.objects.all(),
+    #     label="Site",
+    #     required=False,
+    #     query_params={"region_id": "$termination_b_region"},
+    # )
+    # termination_b_rack = DynamicModelChoiceField(
+    #     queryset=Rack.objects.all(),
+    #     label="Rack",
+    #     required=False,
+    #     null_option="None",
+    #     query_params={"site_id": "$termination_b_site"},
+    # )
+    # termination_b_device = DynamicModelChoiceField(
+    #     queryset=Device.objects.all(),
+    #     label="Device",
+    #     required=False,
+    #     query_params={
+    #         "site_id": "$termination_b_site",
+    #         "rack_id": "$termination_b_rack",
+    #     },
+    # )
     tags = DynamicModelMultipleChoiceField(queryset=Tag.objects.all(), required=False)
 
     class Meta:
         model = Cable
         fields = [
-            "termination_b_region",
-            "termination_b_site",
-            "termination_b_rack",
-            "termination_b_device",
-            "termination_b_id",
+            # "termination_b_region",
+            # "termination_b_site",
+            # "termination_b_rack",
+            # "termination_b_device",
+            # "termination_b_id",
             "type",
             "status",
             "label",
