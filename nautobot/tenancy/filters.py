@@ -1,10 +1,9 @@
 import django_filters
-from django.db.models import Q
 
-from nautobot.extras.filters import CustomFieldModelFilterSet, CreatedUpdatedFilterSet
+from nautobot.extras.filters import NautobotFilterSet
 from nautobot.utilities.filters import (
-    BaseFilterSet,
     NameSlugSearchFilterSet,
+    SearchFilter,
     TagFilter,
     TreeNodeMultipleChoiceFilter,
 )
@@ -18,12 +17,7 @@ __all__ = (
 )
 
 
-class TenantGroupFilterSet(
-    BaseFilterSet,
-    NameSlugSearchFilterSet,
-    CustomFieldModelFilterSet,
-    CreatedUpdatedFilterSet,
-):
+class TenantGroupFilterSet(NautobotFilterSet, NameSlugSearchFilterSet):
     parent_id = django_filters.ModelMultipleChoiceFilter(
         queryset=TenantGroup.objects.all(),
         label="Tenant group (ID)",
@@ -40,10 +34,14 @@ class TenantGroupFilterSet(
         fields = ["id", "name", "slug", "description"]
 
 
-class TenantFilterSet(BaseFilterSet, CustomFieldModelFilterSet, CreatedUpdatedFilterSet):
-    q = django_filters.CharFilter(
-        method="search",
-        label="Search",
+class TenantFilterSet(NautobotFilterSet):
+    q = SearchFilter(
+        filter_predicates={
+            "name": "icontains",
+            "slug": "icontains",
+            "description": "icontains",
+            "comments": "icontains",
+        },
     )
     group_id = TreeNodeMultipleChoiceFilter(
         queryset=TenantGroup.objects.all(),
@@ -63,16 +61,6 @@ class TenantFilterSet(BaseFilterSet, CustomFieldModelFilterSet, CreatedUpdatedFi
     class Meta:
         model = Tenant
         fields = ["id", "name", "slug"]
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value)
-            | Q(slug__icontains=value)
-            | Q(description__icontains=value)
-            | Q(comments__icontains=value)
-        )
 
 
 class TenancyFilterSet(django_filters.FilterSet):

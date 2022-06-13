@@ -25,7 +25,6 @@ from nautobot.utilities.utils import to_meters
 from .devices import Device
 from .device_components import FrontPort, RearPort
 
-
 __all__ = (
     "Cable",
     "CablePath",

@@ -1,4 +1,5 @@
-from django.db.models import OuterRef, Subquery, Q
+from django.db.models import Model, OuterRef, Subquery, Q, F
+from django.db.models.functions import JSONObject
 from django_celery_beat.managers import ExtendedQuerySet
 
 from nautobot.extras.models.tags import TaggedItem
@@ -10,9 +11,6 @@ class ConfigContextQuerySet(RestrictedQuerySet):
     def get_for_object(self, obj):
         """
         Return all applicable ConfigContexts for a given object. Only active ConfigContexts will be included.
-
-        Args:
-          aggregate_data: If True, use the JSONBAgg aggregate function to return only the list of JSON data objects
         """
 
         # `device_role` for Device; `role` for VirtualMachine
@@ -71,8 +69,9 @@ class ConfigContextModelQuerySet(RestrictedQuerySet):
     def annotate_config_context_data(self):
         """
         Attach the subquery annotation to the base queryset.
-        Order By clause in Subquery is not guaranteed to be respected
-        within the aggregated JSON array.
+
+        Order By clause in Subquery is not guaranteed to be respected within the aggregated JSON array, which is why
+        we include "weight" and "name" into the result so that we can sort it within Python to ensure correctness.
         """
         from nautobot.extras.models import ConfigContext
 
@@ -80,7 +79,15 @@ class ConfigContextModelQuerySet(RestrictedQuerySet):
             config_context_data=Subquery(
                 ConfigContext.objects.filter(self._get_config_context_filters())
                 .order_by("weight", "name")
-                .annotate(_data=EmptyGroupByJSONBAgg("data"))
+                .annotate(
+                    _data=EmptyGroupByJSONBAgg(
+                        JSONObject(
+                            data=F("data"),
+                            name=F("name"),
+                            weight=F("weight"),
+                        )
+                    )
+                )
                 .values("_data")
             )
         ).distinct()
@@ -128,6 +135,55 @@ class ConfigContextModelQuerySet(RestrictedQuerySet):
         )
 
         return base_query
+
+
+class DynamicGroupQuerySet(RestrictedQuerySet):
+    """Queryset for `DynamicGroup` objects that provides a `get_for_object` method."""
+
+    def get_for_object(self, obj):
+        """Return all `DynamicGroup` assigned to the given object."""
+        if not isinstance(obj, Model):
+            raise TypeError(f"{obj} is not an instance of Django Model class")
+
+        # Get dynamic groups for this content_type using the discrete content_type fields to
+        # optimize the query.
+        # FIXME(jathan): Try to get the number of queries down. This will scale poorly.
+        # TODO(jathan): 1 query
+        eligible_groups = self.filter(
+            content_type__app_label=obj._meta.app_label, content_type__model=obj._meta.model_name
+        ).select_related("content_type")
+
+        # Filter down to matching groups.
+        my_groups = []
+        # TODO(jathan): 3 queries per DynamicGroup instance
+        for dynamic_group in eligible_groups.iterator():
+            if obj.pk in dynamic_group.get_queryset().values_list("pk", flat=True):
+                my_groups.append(dynamic_group.pk)
+
+        # TODO(jathan): 1 query
+        return self.filter(pk__in=my_groups)
+
+
+class JobQuerySet(RestrictedQuerySet):
+    """
+    Extend the standard queryset with a get_for_class_path method.
+    """
+
+    def get_for_class_path(self, class_path):
+        try:
+            source, module_name, job_class_name = class_path.split("/")
+            repository_slug = None
+            if source.startswith("git."):
+                repository_slug = source[4:]
+                source = "git"
+        except ValueError:  # not a class_path perhaps?
+            raise self.model.DoesNotExist()
+        return self.get(
+            source=source,
+            module_name=module_name,
+            job_class_name=job_class_name,
+            git_repository__slug=repository_slug,
+        )
 
 
 class ScheduledJobExtendedQuerySet(RestrictedQuerySet, ExtendedQuerySet):

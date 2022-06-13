@@ -1,7 +1,9 @@
 import json
+from collections.abc import Iterable
 from urllib.parse import urljoin
 
 from django import forms
+from django.forms.models import ModelChoiceIterator
 from django.urls import get_script_prefix
 
 from nautobot.utilities.choices import ColorChoices
@@ -118,13 +120,20 @@ class APISelect(SelectWithDisabled):
     """
     A select widget populated via an API call
 
-    :param api_url: API endpoint URL. Required if not set automatically by the parent field.
+    Args:
+        api_url: API endpoint URL. Required if not set automatically by the parent field.
+        api_version: API version.
     """
 
-    def __init__(self, api_url=None, full=False, *args, **kwargs):
+    def __init__(self, api_url=None, full=False, api_version=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.attrs["class"] = "nautobot-select2-api"
+
+        if api_version:
+            # Set Request Accept Header api-version e.g Accept: application/json; version=1.2
+            self.attrs["data-api-version"] = api_version
+
         if api_url:
             # Prefix the URL w/ the script prefix (e.g. `/nautobot`)
             self.attrs["data-url"] = urljoin(get_script_prefix(), api_url.lstrip("/"))
@@ -139,12 +148,49 @@ class APISelect(SelectWithDisabled):
         key = f"data-query-param-{name}"
 
         values = json.loads(self.attrs.get(key, "[]"))
-        if type(value) in (list, tuple):
+        if isinstance(value, (list, tuple)):
             values.extend([str(v) for v in value])
         else:
             values.append(str(value))
 
-        self.attrs[key] = json.dumps(values)
+        self.attrs[key] = json.dumps(values, ensure_ascii=False)
+
+    def get_context(self, name, value, attrs):
+
+        # This adds null options to DynamicModelMultipleChoiceField selected choices
+        # example <select ..>
+        #           <option .. selected value="null">None</option>
+        #           <option .. selected value="1234-455...">Rack 001</option>
+        #           <option .. value="1234-455...">Rack 002</option>
+        #          </select>
+        # Prepend null choice to self.choices if
+        # 1. form field allow null_option e.g. DynamicModelMultipleChoiceField(..., null_option="None"..)
+        # 2. if null is part of url query parameter for name(field_name) i.e. http://.../?rack_id=null
+        # 3. if both value and choices are iterable
+        if (
+            self.attrs.get("data-null-option")
+            and isinstance(value, (list, tuple))
+            and "null" in value
+            and isinstance(self.choices, Iterable)
+        ):
+
+            class ModelChoiceIteratorWithNullOption(ModelChoiceIterator):
+                def __init__(self, *args, **kwargs):
+                    self.null_options = kwargs.pop("null_option", None)
+                    super().__init__(*args, **kwargs)
+
+                def __iter__(self):
+                    # ModelChoiceIterator.__iter__() yields a tuple of (value, label)
+                    # using this approach first yield a tuple of (null(value), null_option(label))
+                    yield "null", self.null_options
+                    for item in super().__iter__():
+                        yield item
+
+            null_option = self.attrs.get("data-null-option")
+            choices = ModelChoiceIteratorWithNullOption(field=self.choices.field, null_option=null_option)
+            self.choices = choices
+
+        return super().get_context(name, value, attrs)
 
 
 class APISelectMultiple(APISelect, forms.SelectMultiple):

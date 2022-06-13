@@ -1,8 +1,16 @@
 import datetime
+from django.urls import reverse
 
-from nautobot.circuits.models import Circuit, CircuitType, Provider
+from nautobot.circuits.models import (
+    Circuit,
+    CircuitTermination,
+    CircuitTerminationSideChoices,
+    CircuitType,
+    Provider,
+    ProviderNetwork,
+)
 from nautobot.extras.models import Status
-from nautobot.utilities.testing import ViewTestCases
+from nautobot.utilities.testing import TestCase as NautobotTestCase, ViewTestCases
 
 
 class ProviderTestCase(ViewTestCases.PrimaryObjectViewTestCase):
@@ -22,7 +30,7 @@ class ProviderTestCase(ViewTestCases.PrimaryObjectViewTestCase):
             "name": "Provider X",
             "slug": "provider-x",
             "asn": 65123,
-            "account": "1234",
+            "account": "this-is-a-long-account-number-012345678901234567890123456789",
             "portal_url": "http://example.com/portal",
             "noc_contact": "noc@example.com",
             "admin_contact": "admin@example.com",
@@ -40,7 +48,7 @@ class ProviderTestCase(ViewTestCases.PrimaryObjectViewTestCase):
 
         cls.bulk_edit_data = {
             "asn": 65009,
-            "account": "5678",
+            "account": "this-is-a-long-account-number-012345678901234567890123456789",
             "portal_url": "http://example.com/portal2",
             "noc_contact": "noc2@example.com",
             "admin_contact": "admin2@example.com",
@@ -148,3 +156,95 @@ class CircuitTestCase(ViewTestCases.PrimaryObjectViewTestCase):
             "description": "New description",
             "comments": "New comments",
         }
+
+
+class ProviderNetworkTestCase(ViewTestCases.PrimaryObjectViewTestCase):
+    model = ProviderNetwork
+
+    @classmethod
+    def setUpTestData(cls):
+
+        providers = (
+            Provider(name="Provider 1", slug="provider-1"),
+            Provider(name="Provider 2", slug="provider-2"),
+        )
+        Provider.objects.bulk_create(providers)
+
+        ProviderNetwork.objects.bulk_create(
+            [
+                ProviderNetwork(name="Provider Network 1", slug="provider-network-1", provider=providers[0]),
+                ProviderNetwork(name="Provider Network 2", slug="provider-network-2", provider=providers[0]),
+                ProviderNetwork(name="Provider Network 3", slug="provider-network-3", provider=providers[0]),
+                ProviderNetwork(name="Provider Network 8", provider=providers[0]),
+            ]
+        )
+
+        tags = cls.create_tags("Alpha", "Bravo", "Charlie")
+
+        cls.form_data = {
+            "name": "ProviderNetwork X",
+            "slug": "provider-network-x",
+            "provider": providers[1].pk,
+            "description": "A new ProviderNetwork",
+            "comments": "Longer description goes here",
+            "tags": [t.pk for t in tags],
+        }
+
+        cls.csv_data = (
+            "name,slug,provider,description",
+            "Provider Network 4,provider-network-4,Provider 1,Foo",
+            "Provider Network 5,provider-network-5,Provider 1,Bar",
+            "Provider Network 6,provider-network-6,Provider 1,Baz",
+            "Provider Network 7,,Provider 1,Baz",
+        )
+
+        cls.bulk_edit_data = {
+            "provider": providers[1].pk,
+            "description": "New description",
+            "comments": "New comments",
+        }
+
+        cls.slug_test_object = "Provider Network 8"
+        cls.slug_source = "name"
+
+
+class CircuitTerminationTestCase(NautobotTestCase):
+    def setUp(self):
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+
+    def test_circuit_termination_detail_200(self):
+        """
+        This tests that a circuit termination's detail page (with a provider
+        network instead of a site) returns a 200 response and doesn't contain the connect menu button.
+        """
+
+        # Set up the required objects:
+        provider = Provider.objects.create(name="Test Provider", slug="test-provider", asn=12345)
+        provider_network = ProviderNetwork.objects.create(
+            name="Test Provider Network",
+            slug="test-provider-network",
+            provider=provider,
+        )
+        circuit_type = CircuitType.objects.create(name="Test Circuit Type", slug="test-circuit-type")
+        active_status = Status.objects.get_for_model(Circuit).get(slug="active")
+        circuit = Circuit.objects.create(
+            cid="Test Circuit",
+            provider=provider,
+            type=circuit_type,
+            status=active_status,
+        )
+        termination = CircuitTermination.objects.create(
+            circuit=circuit, provider_network=provider_network, term_side=CircuitTerminationSideChoices.SIDE_A
+        )
+
+        # Visit the termination detail page and assert responses:
+        response = self.client.get(reverse("circuits:circuittermination", kwargs={"pk": termination.pk}))
+        self.assertEqual(200, response.status_code)
+        self.assertIn("Test Provider Network", str(response.content))
+        self.assertNotIn("</span> Connect", str(response.content))
+
+        # Visit the circuit object detail page and check there is no connect button present:
+        response = self.client.get(reverse("circuits:circuit", kwargs={"pk": circuit.pk}))
+        self.assertNotIn("</span> Connect", str(response.content))

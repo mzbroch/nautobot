@@ -8,7 +8,6 @@ from django.urls import reverse
 from mptt.models import MPTTModel, TreeForeignKey
 from taggit.managers import TaggableManager
 
-
 from nautobot.dcim.choices import (
     ConsolePortTypeChoices,
     InterfaceModeChoices,
@@ -40,8 +39,7 @@ from nautobot.utilities.fields import NaturalOrderingField
 from nautobot.utilities.mptt import TreeManager
 from nautobot.utilities.ordering import naturalize_interface
 from nautobot.utilities.query_functions import CollateAsChar
-from nautobot.utilities.utils import UtilizationData, serialize_object
-
+from nautobot.utilities.utils import UtilizationData, serialize_object, serialize_object_v2
 
 __all__ = (
     "BaseInterface",
@@ -65,8 +63,8 @@ class ComponentModel(BaseModel, CustomFieldModel, RelationshipModel):
     """
 
     device = models.ForeignKey(to="dcim.Device", on_delete=models.CASCADE, related_name="%(class)ss")
-    name = models.CharField(max_length=64)
-    _name = NaturalOrderingField(target_field="name", max_length=100, blank=True)
+    name = models.CharField(max_length=64, db_index=True)
+    _name = NaturalOrderingField(target_field="name", max_length=100, blank=True, db_index=True)
     label = models.CharField(max_length=64, blank=True, help_text="Physical label")
     description = models.CharField(max_length=200, blank=True)
     tags = TaggableManager(through=TaggedItem)
@@ -86,12 +84,14 @@ class ComponentModel(BaseModel, CustomFieldModel, RelationshipModel):
         except ObjectDoesNotExist:
             # The parent Device has already been deleted
             device = None
+
         return ObjectChange(
             changed_object=self,
             object_repr=str(self),
             action=action,
-            related_object=device,
             object_data=serialize_object(self),
+            object_data_v2=serialize_object_v2(self),
+            related_object=device,
         )
 
     @property
@@ -499,11 +499,12 @@ class BaseInterface(RelationshipModel):
     class Meta:
         abstract = True
 
-    def save(self, *args, **kwargs):
-
+    def clean(self):
         # Remove untagged VLAN assignment for non-802.1Q interfaces
-        if not self.mode:
-            self.untagged_vlan = None
+        if not self.mode and self.untagged_vlan is not None:
+            raise ValidationError({"untagged_vlan": "Mode must be set when specifying untagged_vlan"})
+
+    def save(self, *args, **kwargs):
 
         # Only "tagged" interfaces may have tagged VLANs assigned. ("tagged all" implies all VLANs are assigned.)
         if self.present_in_database and self.mode != InterfaceModeChoices.MODE_TAGGED:
@@ -527,10 +528,7 @@ class Interface(CableTermination, PathEndpoint, ComponentModel, BaseInterface):
 
     # Override ComponentModel._name to specify naturalize_interface function
     _name = NaturalOrderingField(
-        target_field="name",
-        naturalize_function=naturalize_interface,
-        max_length=100,
-        blank=True,
+        target_field="name", naturalize_function=naturalize_interface, max_length=100, blank=True, db_index=True
     )
     lag = models.ForeignKey(
         to="self",
@@ -896,7 +894,7 @@ class InventoryItem(MPTTModel, ComponentModel):
         blank=True,
         help_text="Manufacturer-assigned part identifier",
     )
-    serial = models.CharField(max_length=50, verbose_name="Serial number", blank=True)
+    serial = models.CharField(max_length=255, verbose_name="Serial number", blank=True, db_index=True)
     asset_tag = models.CharField(
         max_length=50,
         unique=True,

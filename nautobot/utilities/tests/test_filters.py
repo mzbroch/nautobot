@@ -28,6 +28,7 @@ from nautobot.utilities.filters import (
     MultiValueDateTimeFilter,
     MultiValueNumberFilter,
     MultiValueTimeFilter,
+    SearchFilter,
     TagFilter,
     TreeNodeMultipleChoiceFilter,
 )
@@ -89,9 +90,9 @@ class TreeNodeMultipleChoiceFilterTest(TestCase):
         self.assertEqual(qs[1], self.site3)
 
 
-class DummyModel(models.Model):
+class TestModel(models.Model):
     """
-    Dummy model used by BaseFilterSetTest for filter validation. Should never appear in a schema migration.
+    Test model used by BaseFilterSetTest for filter validation. Should never appear in a schema migration.
     """
 
     charfield = models.CharField(max_length=10)
@@ -100,6 +101,7 @@ class DummyModel(models.Model):
     datetimefield = models.DateTimeField()
     integerfield = models.IntegerField()
     macaddressfield = MACAddressField()
+    textfield = models.TextField()
     timefield = models.TimeField()
     treeforeignkeyfield = TreeForeignKey(to="self", on_delete=models.CASCADE)
 
@@ -111,7 +113,7 @@ class BaseFilterSetTest(TestCase):
     Ensure that a BaseFilterSet automatically creates the expected set of filters for each filter type.
     """
 
-    class DummyFilterSet(BaseFilterSet):
+    class TestFilterSet(BaseFilterSet):
         charfield = django_filters.CharFilter()
         macaddressfield = MACAddressFilter()
         modelchoicefield = django_filters.ModelChoiceFilter(
@@ -125,10 +127,10 @@ class BaseFilterSetTest(TestCase):
         multiplechoicefield = django_filters.MultipleChoiceFilter(field_name="choicefield")
         multivaluecharfield = MultiValueCharFilter(field_name="charfield")
         tagfield = TagFilter()
-        treeforeignkeyfield = TreeNodeMultipleChoiceFilter(queryset=DummyModel.objects.all())
+        treeforeignkeyfield = TreeNodeMultipleChoiceFilter(queryset=TestModel.objects.all())
 
         class Meta:
-            model = DummyModel
+            model = TestModel
             fields = (
                 "charfield",
                 "choicefield",
@@ -140,13 +142,73 @@ class BaseFilterSetTest(TestCase):
                 "modelmultiplechoicefield",
                 "multiplechoicefield",
                 "tagfield",
+                "textfield",
                 "timefield",
                 "treeforeignkeyfield",
             )
 
     @classmethod
     def setUpTestData(cls):
-        cls.filters = cls.DummyFilterSet().filters
+        cls.filters = cls.TestFilterSet().filters
+
+    def test_generated_lookup_expression_filters(self):
+        """
+        Tests to ensure the internal helper method expands a CharFilter out to all natural lookup expressions.
+
+        Used by declared filters expansion and adding new filters.
+        """
+        magic_lookups = self.TestFilterSet._generate_lookup_expression_filters(
+            "magic_charfield", django_filters.CharFilter(field_name="charfield")
+        )
+
+        self.assertEqual(magic_lookups["magic_charfield__n"].lookup_expr, "exact")
+        self.assertEqual(magic_lookups["magic_charfield__n"].exclude, True)
+        self.assertEqual(magic_lookups["magic_charfield__ie"].lookup_expr, "iexact")
+        self.assertEqual(magic_lookups["magic_charfield__ie"].exclude, False)
+        self.assertEqual(magic_lookups["magic_charfield__nie"].lookup_expr, "iexact")
+        self.assertEqual(magic_lookups["magic_charfield__nie"].exclude, True)
+        self.assertEqual(magic_lookups["magic_charfield__ic"].lookup_expr, "icontains")
+        self.assertEqual(magic_lookups["magic_charfield__ic"].exclude, False)
+        self.assertEqual(magic_lookups["magic_charfield__nic"].lookup_expr, "icontains")
+        self.assertEqual(magic_lookups["magic_charfield__nic"].exclude, True)
+        self.assertEqual(magic_lookups["magic_charfield__isw"].lookup_expr, "istartswith")
+        self.assertEqual(magic_lookups["magic_charfield__isw"].exclude, False)
+        self.assertEqual(magic_lookups["magic_charfield__nisw"].lookup_expr, "istartswith")
+        self.assertEqual(magic_lookups["magic_charfield__nisw"].exclude, True)
+        self.assertEqual(magic_lookups["magic_charfield__iew"].lookup_expr, "iendswith")
+        self.assertEqual(magic_lookups["magic_charfield__iew"].exclude, False)
+        self.assertEqual(magic_lookups["magic_charfield__niew"].lookup_expr, "iendswith")
+        self.assertEqual(magic_lookups["magic_charfield__niew"].exclude, True)
+        self.assertEqual(magic_lookups["magic_charfield__re"].lookup_expr, "regex")
+        self.assertEqual(magic_lookups["magic_charfield__re"].exclude, False)
+        self.assertEqual(magic_lookups["magic_charfield__nre"].lookup_expr, "regex")
+        self.assertEqual(magic_lookups["magic_charfield__nre"].exclude, True)
+        self.assertEqual(magic_lookups["magic_charfield__ire"].lookup_expr, "iregex")
+        self.assertEqual(magic_lookups["magic_charfield__ire"].exclude, False)
+        self.assertEqual(magic_lookups["magic_charfield__nire"].lookup_expr, "iregex")
+        self.assertEqual(magic_lookups["magic_charfield__nire"].exclude, True)
+
+    def test_add_filter_field(self):
+        """
+        Testing to ensure add_filter method adds provided filter to resulting list as well as automagic expanded lookup expressions.
+        """
+        new_filter_set_field_name = "tacos"
+        new_filter_set_field = django_filters.CharFilter(field_name="charfield")
+
+        self.assertNotIn("tacos", self.TestFilterSet().filters.keys())
+
+        self.TestFilterSet.add_filter(new_filter_name=new_filter_set_field_name, new_filter_field=new_filter_set_field)
+
+        new_filter_keys = self.TestFilterSet().filters.keys()
+        self.assertIn("tacos", new_filter_keys)
+        self.assertIn("tacos__n", new_filter_keys)
+        self.assertIn("tacos__ie", new_filter_keys)
+
+        with self.assertRaises(TypeError):
+            self.TestFilterSet.add_filter(new_filter_name="tacos", new_filter_field=None)
+
+        with self.assertRaises(AttributeError):
+            self.TestFilterSet.add_filter(new_filter_name="charfield", new_filter_field=new_filter_set_field)
 
     def test_char_filter(self):
         self.assertIsInstance(self.filters["charfield"], django_filters.CharFilter)
@@ -170,6 +232,14 @@ class BaseFilterSetTest(TestCase):
         self.assertEqual(self.filters["charfield__iew"].exclude, False)
         self.assertEqual(self.filters["charfield__niew"].lookup_expr, "iendswith")
         self.assertEqual(self.filters["charfield__niew"].exclude, True)
+        self.assertEqual(self.filters["charfield__re"].lookup_expr, "regex")
+        self.assertEqual(self.filters["charfield__re"].exclude, False)
+        self.assertEqual(self.filters["charfield__nre"].lookup_expr, "regex")
+        self.assertEqual(self.filters["charfield__nre"].exclude, True)
+        self.assertEqual(self.filters["charfield__ire"].lookup_expr, "iregex")
+        self.assertEqual(self.filters["charfield__ire"].exclude, False)
+        self.assertEqual(self.filters["charfield__nire"].lookup_expr, "iregex")
+        self.assertEqual(self.filters["charfield__nire"].exclude, True)
 
     def test_mac_address_filter(self):
         self.assertIsInstance(self.filters["macaddressfield"], MACAddressFilter)
@@ -193,6 +263,14 @@ class BaseFilterSetTest(TestCase):
         self.assertEqual(self.filters["macaddressfield__iew"].exclude, False)
         self.assertEqual(self.filters["macaddressfield__niew"].lookup_expr, "iendswith")
         self.assertEqual(self.filters["macaddressfield__niew"].exclude, True)
+        self.assertEqual(self.filters["macaddressfield__re"].lookup_expr, "regex")
+        self.assertEqual(self.filters["macaddressfield__re"].exclude, False)
+        self.assertEqual(self.filters["macaddressfield__nre"].lookup_expr, "regex")
+        self.assertEqual(self.filters["macaddressfield__nre"].exclude, True)
+        self.assertEqual(self.filters["macaddressfield__ire"].lookup_expr, "iregex")
+        self.assertEqual(self.filters["macaddressfield__ire"].exclude, False)
+        self.assertEqual(self.filters["macaddressfield__nire"].lookup_expr, "iregex")
+        self.assertEqual(self.filters["macaddressfield__nire"].exclude, True)
 
     def test_model_choice_filter(self):
         self.assertIsInstance(self.filters["modelchoicefield"], django_filters.ModelChoiceFilter)
@@ -233,6 +311,45 @@ class BaseFilterSetTest(TestCase):
         self.assertEqual(self.filters["multivaluecharfield__iew"].exclude, False)
         self.assertEqual(self.filters["multivaluecharfield__niew"].lookup_expr, "iendswith")
         self.assertEqual(self.filters["multivaluecharfield__niew"].exclude, True)
+        self.assertEqual(self.filters["multivaluecharfield__re"].lookup_expr, "regex")
+        self.assertEqual(self.filters["multivaluecharfield__re"].exclude, False)
+        self.assertEqual(self.filters["multivaluecharfield__nre"].lookup_expr, "regex")
+        self.assertEqual(self.filters["multivaluecharfield__nre"].exclude, True)
+        self.assertEqual(self.filters["multivaluecharfield__ire"].lookup_expr, "iregex")
+        self.assertEqual(self.filters["multivaluecharfield__ire"].exclude, False)
+        self.assertEqual(self.filters["multivaluecharfield__nire"].lookup_expr, "iregex")
+        self.assertEqual(self.filters["multivaluecharfield__nire"].exclude, True)
+
+    def test_textfield_multi_value_char_filter(self):
+        self.assertIsInstance(self.filters["textfield"], MultiValueCharFilter)
+        self.assertEqual(self.filters["textfield"].lookup_expr, "exact")
+        self.assertEqual(self.filters["textfield"].exclude, False)
+        self.assertEqual(self.filters["textfield__n"].lookup_expr, "exact")
+        self.assertEqual(self.filters["textfield__n"].exclude, True)
+        self.assertEqual(self.filters["textfield__ie"].lookup_expr, "iexact")
+        self.assertEqual(self.filters["textfield__ie"].exclude, False)
+        self.assertEqual(self.filters["textfield__nie"].lookup_expr, "iexact")
+        self.assertEqual(self.filters["textfield__nie"].exclude, True)
+        self.assertEqual(self.filters["textfield__ic"].lookup_expr, "icontains")
+        self.assertEqual(self.filters["textfield__ic"].exclude, False)
+        self.assertEqual(self.filters["textfield__nic"].lookup_expr, "icontains")
+        self.assertEqual(self.filters["textfield__nic"].exclude, True)
+        self.assertEqual(self.filters["textfield__isw"].lookup_expr, "istartswith")
+        self.assertEqual(self.filters["textfield__isw"].exclude, False)
+        self.assertEqual(self.filters["textfield__nisw"].lookup_expr, "istartswith")
+        self.assertEqual(self.filters["textfield__nisw"].exclude, True)
+        self.assertEqual(self.filters["textfield__iew"].lookup_expr, "iendswith")
+        self.assertEqual(self.filters["textfield__iew"].exclude, False)
+        self.assertEqual(self.filters["textfield__niew"].lookup_expr, "iendswith")
+        self.assertEqual(self.filters["textfield__niew"].exclude, True)
+        self.assertEqual(self.filters["textfield__re"].lookup_expr, "regex")
+        self.assertEqual(self.filters["textfield__re"].exclude, False)
+        self.assertEqual(self.filters["textfield__nre"].lookup_expr, "regex")
+        self.assertEqual(self.filters["textfield__nre"].exclude, True)
+        self.assertEqual(self.filters["textfield__ire"].lookup_expr, "iregex")
+        self.assertEqual(self.filters["textfield__ire"].exclude, False)
+        self.assertEqual(self.filters["textfield__nire"].lookup_expr, "iregex")
+        self.assertEqual(self.filters["textfield__nire"].exclude, True)
 
     def test_multi_value_date_filter(self):
         self.assertIsInstance(self.filters["datefield"], MultiValueDateFilter)
@@ -316,6 +433,14 @@ class BaseFilterSetTest(TestCase):
         self.assertEqual(self.filters["multiplechoicefield__iew"].exclude, False)
         self.assertEqual(self.filters["multiplechoicefield__niew"].lookup_expr, "iendswith")
         self.assertEqual(self.filters["multiplechoicefield__niew"].exclude, True)
+        self.assertEqual(self.filters["multiplechoicefield__re"].lookup_expr, "regex")
+        self.assertEqual(self.filters["multiplechoicefield__re"].exclude, False)
+        self.assertEqual(self.filters["multiplechoicefield__nre"].lookup_expr, "regex")
+        self.assertEqual(self.filters["multiplechoicefield__nre"].exclude, True)
+        self.assertEqual(self.filters["multiplechoicefield__ire"].lookup_expr, "iregex")
+        self.assertEqual(self.filters["multiplechoicefield__ire"].exclude, False)
+        self.assertEqual(self.filters["multiplechoicefield__nire"].lookup_expr, "iregex")
+        self.assertEqual(self.filters["multiplechoicefield__nire"].exclude, True)
 
     def test_tag_filter(self):
         self.assertIsInstance(self.filters["tagfield"], TagFilter)
@@ -428,6 +553,7 @@ class DynamicFilterLookupExpressionTest(TestCase):
                 face=DeviceFaceChoices.FACE_FRONT,
                 status=device_status_map["active"],
                 local_context_data={"foo": 123},
+                comments="Device 1 comments",
             ),
             Device(
                 name="Device 2",
@@ -441,6 +567,7 @@ class DynamicFilterLookupExpressionTest(TestCase):
                 position=2,
                 face=DeviceFaceChoices.FACE_FRONT,
                 status=device_status_map["staged"],
+                comments="Device 2 comments",
             ),
             Device(
                 name="Device 3",
@@ -454,6 +581,7 @@ class DynamicFilterLookupExpressionTest(TestCase):
                 position=3,
                 face=DeviceFaceChoices.FACE_REAR,
                 status=device_status_map["failed"],
+                comments="Device 3 comments",
             ),
         )
         Device.objects.bulk_create(devices)
@@ -467,6 +595,13 @@ class DynamicFilterLookupExpressionTest(TestCase):
             Interface(device=devices[2], name="Interface 6", mac_address="cc-00-00-00-00-03"),
         )
         Interface.objects.bulk_create(interfaces)
+
+    class DeviceFilterSetWithComments(DeviceFilterSet):
+        class Meta:
+            model = Device
+            fields = [
+                "comments",
+            ]
 
     def test_site_name_negation(self):
         params = {"name__n": ["Site 1"]}
@@ -495,6 +630,22 @@ class DynamicFilterLookupExpressionTest(TestCase):
     def test_site_slug_endswith_negation(self):
         params = {"slug__niew": ["-1"]}
         self.assertEqual(SiteFilterSet(params, self.site_queryset).qs.count(), 2)
+
+    def test_site_slug_regex(self):
+        params = {"slug__re": ["-1$"]}
+        self.assertEqual(SiteFilterSet(params, self.site_queryset).qs.count(), 1)
+
+    def test_site_slug_regex_negation(self):
+        params = {"slug__nre": ["-1$"]}
+        self.assertEqual(SiteFilterSet(params, self.site_queryset).qs.count(), 2)
+
+    def test_site_slug_iregex(self):
+        params = {"slug__ire": ["SITE"]}
+        self.assertEqual(SiteFilterSet(params, self.site_queryset).qs.count(), 3)
+
+    def test_site_slug_iregex_negation(self):
+        params = {"slug__nire": ["SITE"]}
+        self.assertEqual(SiteFilterSet(params, self.site_queryset).qs.count(), 0)
 
     def test_site_asn_lt(self):
         params = {"asn__lt": [65101]}
@@ -579,3 +730,155 @@ class DynamicFilterLookupExpressionTest(TestCase):
     def test_device_mac_address_icontains_negation(self):
         params = {"mac_address__nic": ["aa:", "bb"]}
         self.assertEqual(DeviceFilterSet(params, self.device_queryset).qs.count(), 1)
+
+    def test_device_mac_address_regex(self):
+        params = {"mac_address__re": ["^AA:"]}
+        self.assertEqual(DeviceFilterSet(params, self.device_queryset).qs.count(), 1)
+
+    def test_device_mac_address_iregex(self):
+        params = {"mac_address__ire": ["^aa:"]}
+        self.assertEqual(DeviceFilterSet(params, self.device_queryset).qs.count(), 1)
+
+    def test_device_mac_address_regex_negation(self):
+        params = {"mac_address__nre": ["^AA:"]}
+        self.assertEqual(DeviceFilterSet(params, self.device_queryset).qs.count(), 2)
+
+    def test_device_mac_address_iregex_negation(self):
+        params = {"mac_address__nire": ["^aa:"]}
+        self.assertEqual(DeviceFilterSet(params, self.device_queryset).qs.count(), 2)
+
+    def test_device_comments_multiple_value_charfield(self):
+        params = {"comments": ["Device 1 comments"]}
+        self.assertEqual(self.DeviceFilterSetWithComments(params, self.device_queryset).qs.count(), 1)
+        params = {"comments": ["Device 1 comments", "Device 2 comments"]}
+        self.assertEqual(self.DeviceFilterSetWithComments(params, self.device_queryset).qs.count(), 2)
+        params = {"comments": ["Device 1 comments", "Device 2 comments", "Device 3 comments"]}
+        self.assertEqual(self.DeviceFilterSetWithComments(params, self.device_queryset).qs.count(), 3)
+
+    def test_device_comments_multiple_value_charfield_regex(self):
+        params = {"comments__re": ["^Device"]}
+        self.assertEqual(self.DeviceFilterSetWithComments(params, self.device_queryset).qs.count(), 3)
+
+    def test_device_comments_multiple_value_charfield_regex_negation(self):
+        params = {"comments__nre": ["^Device"]}
+        self.assertEqual(self.DeviceFilterSetWithComments(params, self.device_queryset).qs.count(), 0)
+
+    def test_device_comments_multiple_value_charfield_iregex(self):
+        params = {"comments__ire": ["^device"]}
+        self.assertEqual(self.DeviceFilterSetWithComments(params, self.device_queryset).qs.count(), 3)
+
+    def test_device_comments_multiple_value_charfield_iregex_negation(self):
+        params = {"comments__nire": ["^device"]}
+        self.assertEqual(self.DeviceFilterSetWithComments(params, self.device_queryset).qs.count(), 0)
+
+
+class SearchFilterTest(TestCase):
+    """Tests for the `SearchFilter` filter class."""
+
+    filterset_class = SiteFilterSet
+
+    def setUp(self):
+
+        super().setUp()
+
+        self.region1 = Region.objects.create(name="Test Region 1", slug="test-region-1")
+        self.region2 = Region.objects.create(name="Test Region 2", slug="test-region-2")
+        self.site1 = Site.objects.create(region=self.region1, name="Test Site 1", slug="test-site1", asn=1234)
+        self.site2 = Site.objects.create(region=self.region2, name="Test Site 2", slug="test-site2", asn=12345)
+        self.site3 = Site.objects.create(region=None, name="Test Site 3", slug="test-site3")
+        self.site4 = Site.objects.create(region=None, name="Test Site4", slug="test-site4")
+
+        self.queryset = Site.objects.all()
+
+    def get_filterset_count(self, params, klass=None):
+        """To save ourselves some boilerplate."""
+        if klass is None:
+            klass = self.filterset_class
+        return klass(params, self.queryset).qs.count()
+
+    def test_default_icontains(self):
+        """Test a default search for an "icontains" value."""
+        params = {"q": "Test Site"}
+        self.assertEqual(self.get_filterset_count(params), 4)
+        params = {"q": "Test Site 3"}
+        self.assertEqual(self.get_filterset_count(params), 1)
+        # Trailing space should only match the first 3.
+        params = {"q": "Test Site "}
+        self.assertEqual(self.get_filterset_count(params), 3)
+
+    def test_default_exact(self):
+        """Test a default search for an "exact" value."""
+        params = {"q": "1234"}
+        self.assertEqual(self.get_filterset_count(params), 1)
+        params = {"q": "123"}
+        self.assertEqual(self.get_filterset_count(params), 0)
+
+    def test_default_id(self):
+        """Test default search on "id" field."""
+        # Search is iexact so UUID search for lower/upper return the same result.
+        obj_pk = str(self.site1.pk)
+        params = {"q": obj_pk.lower()}
+        self.assertEqual(self.get_filterset_count(params), 1)
+        params = {"q": obj_pk.upper()}
+        self.assertEqual(self.get_filterset_count(params), 1)
+
+    def test_typed_valid(self):
+        """Test that validly-typed predicate mappings are handled correctly."""
+
+        class MySiteFilterSet(SiteFilterSet):
+            """Overload the default just to illustrate that it's all we're testing for here."""
+
+            q = SearchFilter(filter_predicates={"asn": {"lookup_expr": "exact", "preprocessor": int}})
+
+        params = {"q": "1234"}
+        self.assertEqual(self.get_filterset_count(params, MySiteFilterSet), 1)
+        params = {"q": "123"}
+        self.assertEqual(self.get_filterset_count(params, MySiteFilterSet), 0)
+
+        # Further an invalid type (e.g. dict) will just result in the predicate for ASN to be skipped
+        class MySiteFilterSet2(SiteFilterSet):
+            """Overload the default just to illustrate that it's all we're testing for here."""
+
+            q = SearchFilter(filter_predicates={"asn": {"lookup_expr": "exact", "preprocessor": dict}})
+
+        params = {"q": "1234"}
+        self.assertEqual(self.get_filterset_count(params, MySiteFilterSet2), 0)
+
+    def test_typed_icontains(self):
+        """Test a preprocessor to strip icontains (which wouldn't be by default)."""
+
+        class MySiteFilterSet(SiteFilterSet):
+            """Overload the default just to illustrate that it's all we're testing for here."""
+
+            q = SearchFilter(filter_predicates={"name": {"lookup_expr": "icontains", "preprocessor": str.strip}})
+
+        # Both searches should return the same results.
+        params = {"q": "Test Site"}
+        self.assertEqual(self.get_filterset_count(params, MySiteFilterSet), 4)
+        params = {"q": "Test Site "}
+        self.assertEqual(self.get_filterset_count(params, MySiteFilterSet), 4)
+
+    def test_typed_invalid(self):
+        """Test that incorrectly-typed predicate mappings are handled correctly."""
+        # Bad preprocessor callable in expanded form
+        with self.assertRaises(TypeError):
+            barf = None
+
+            class BarfSiteFilterSet(SiteFilterSet):
+                q = SearchFilter(
+                    filter_predicates={
+                        "asn": {"preprocessor": barf, "lookup_expr": "exact"},
+                    },
+                )
+
+        # Missing preprocessor callable in expanded form should also fail
+        with self.assertRaises(TypeError):
+
+            class MissingSiteFilterSet(SiteFilterSet):
+                q = SearchFilter(filter_predicates={"asn": {"lookup_expr": "exact"}})
+
+        # Incorrect lookup_info type (must be str or dict)
+        with self.assertRaises(TypeError):
+
+            class InvalidSiteFilterSet(SiteFilterSet):
+                q = SearchFilter(filter_predicates={"asn": ["icontains"]})

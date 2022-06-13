@@ -4,8 +4,8 @@ from django.db.models import Q
 from nautobot.dcim.models import DeviceRole, Platform, Region, Site
 from nautobot.extras.filters import (
     CustomFieldModelFilterSet,
-    CreatedUpdatedFilterSet,
     LocalContextFilterSet,
+    NautobotFilterSet,
     StatusModelFilterSetMixin,
 )
 from nautobot.tenancy.filters import TenancyFilterSet
@@ -13,6 +13,7 @@ from nautobot.utilities.filters import (
     BaseFilterSet,
     MultiValueMACAddressFilter,
     NameSlugSearchFilterSet,
+    SearchFilter,
     TagFilter,
     TreeNodeMultipleChoiceFilter,
 )
@@ -27,32 +28,24 @@ __all__ = (
 )
 
 
-class ClusterTypeFilterSet(
-    BaseFilterSet,
-    NameSlugSearchFilterSet,
-    CustomFieldModelFilterSet,
-    CreatedUpdatedFilterSet,
-):
+class ClusterTypeFilterSet(NautobotFilterSet, NameSlugSearchFilterSet):
     class Meta:
         model = ClusterType
         fields = ["id", "name", "slug", "description"]
 
 
-class ClusterGroupFilterSet(
-    BaseFilterSet,
-    NameSlugSearchFilterSet,
-    CustomFieldModelFilterSet,
-    CreatedUpdatedFilterSet,
-):
+class ClusterGroupFilterSet(NautobotFilterSet, NameSlugSearchFilterSet):
     class Meta:
         model = ClusterGroup
         fields = ["id", "name", "slug", "description"]
 
 
-class ClusterFilterSet(BaseFilterSet, TenancyFilterSet, CustomFieldModelFilterSet, CreatedUpdatedFilterSet):
-    q = django_filters.CharFilter(
-        method="search",
-        label="Search",
+class ClusterFilterSet(NautobotFilterSet, TenancyFilterSet):
+    q = SearchFilter(
+        filter_predicates={
+            "name": "icontains",
+            "comments": "icontains",
+        },
     )
     region_id = TreeNodeMultipleChoiceFilter(
         queryset=Region.objects.all(),
@@ -103,23 +96,13 @@ class ClusterFilterSet(BaseFilterSet, TenancyFilterSet, CustomFieldModelFilterSe
         model = Cluster
         fields = ["id", "name"]
 
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(Q(name__icontains=value) | Q(comments__icontains=value))
 
-
-class VirtualMachineFilterSet(
-    BaseFilterSet,
-    LocalContextFilterSet,
-    TenancyFilterSet,
-    StatusModelFilterSetMixin,
-    CustomFieldModelFilterSet,
-    CreatedUpdatedFilterSet,
-):
-    q = django_filters.CharFilter(
-        method="search",
-        label="Search",
+class VirtualMachineFilterSet(NautobotFilterSet, LocalContextFilterSet, TenancyFilterSet, StatusModelFilterSetMixin):
+    q = SearchFilter(
+        filter_predicates={
+            "name": "icontains",
+            "comments": "icontains",
+        },
     )
     cluster_group_id = django_filters.ModelMultipleChoiceFilter(
         field_name="cluster__group",
@@ -205,11 +188,6 @@ class VirtualMachineFilterSet(
         model = VirtualMachine
         fields = ["id", "name", "cluster", "vcpus", "memory", "disk"]
 
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(Q(name__icontains=value) | Q(comments__icontains=value))
-
     def _has_primary_ip(self, queryset, name, value):
         params = Q(primary_ip4__isnull=False) | Q(primary_ip6__isnull=False)
         if value:
@@ -218,10 +196,7 @@ class VirtualMachineFilterSet(
 
 
 class VMInterfaceFilterSet(BaseFilterSet, CustomFieldModelFilterSet):
-    q = django_filters.CharFilter(
-        method="search",
-        label="Search",
-    )
+    q = SearchFilter(filter_predicates={"name": "icontains"})
     cluster_id = django_filters.ModelMultipleChoiceFilter(
         field_name="virtual_machine__cluster",
         queryset=Cluster.objects.all(),
@@ -252,8 +227,3 @@ class VMInterfaceFilterSet(BaseFilterSet, CustomFieldModelFilterSet):
     class Meta:
         model = VMInterface
         fields = ["id", "name", "enabled", "mtu"]
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(Q(name__icontains=value))

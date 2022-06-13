@@ -1,10 +1,12 @@
 from unittest import skipIf
 
 import netaddr
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import TestCase, override_settings
 
+from nautobot.dcim.models import Device, DeviceRole, DeviceType, Interface, Manufacturer, Site
 from nautobot.extras.models import Status
 from nautobot.ipam.choices import IPAddressRoleChoices
 from nautobot.ipam.models import Aggregate, IPAddress, Prefix, RIR, VLAN, VLANGroup, VRF
@@ -309,14 +311,37 @@ class TestPrefix(TestCase):
         )
         self.assertEqual(prefix.get_utilization(), (128, 256))
 
-        # Non-container Prefix
+        # IPv4 Non-container Prefix /24
         prefix.status = self.statuses.get(slug="active")
         prefix.save()
         IPAddress.objects.bulk_create(
             # Create 32 IPAddresses within the Prefix
             [IPAddress(address=netaddr.IPNetwork("10.0.0.{}/24".format(i))) for i in range(1, 33)]
         )
+        # Create IPAddress objects for network and broadcast addresses
+        IPAddress.objects.bulk_create(
+            (IPAddress(address=netaddr.IPNetwork("10.0.0.0/32")), IPAddress(address=netaddr.IPNetwork("10.0.0.255/32")))
+        )
         self.assertEqual(prefix.get_utilization(), (32, 254))
+
+        # Change prefix to a pool, network and broadcast address will count toward numerator and denominator in utilization
+        prefix.is_pool = True
+        prefix.save()
+        self.assertEqual(prefix.get_utilization(), (34, 256))
+
+        # IPv4 Non-container Prefix /31, network and broadcast addresses count toward utilization
+        prefix = Prefix.objects.create(prefix="10.0.1.0/31")
+        IPAddress.objects.bulk_create(
+            (IPAddress(address=netaddr.IPNetwork("10.0.1.0/32")), IPAddress(address=netaddr.IPNetwork("10.0.1.1/32")))
+        )
+        self.assertEqual(prefix.get_utilization(), (2, 2))
+
+        # IPv6 Non-container Prefix, network and broadcast addresses count toward utilization
+        prefix = Prefix.objects.create(prefix="aaaa::/124")
+        IPAddress.objects.bulk_create(
+            (IPAddress(address=netaddr.IPNetwork("aaaa::0/128")), IPAddress(address=netaddr.IPNetwork("aaaa::f/128")))
+        )
+        self.assertEqual(prefix.get_utilization(), (2, 16))
 
     #
     # Uniqueness enforcement tests
@@ -396,6 +421,85 @@ class TestIPAddress(TestCase):
             address=netaddr.IPNetwork("192.0.2.1/24"),
             role=IPAddressRoleChoices.ROLE_VIP,
         )
+
+    def test_multiple_nat_outside(self):
+        """
+        Test suite to test supporing multiple nat_inside related fields.
+
+        Includes tests for legacy getter/setter for nat_outside.
+        """
+
+        # Setup mimicked legacy data model relationships: 1-to-1
+        nat_inside = IPAddress.objects.create(address=netaddr.IPNetwork("192.168.0.1/24"))
+        nat_outside1 = IPAddress.objects.create(address=netaddr.IPNetwork("192.0.2.1/24"), nat_inside=nat_inside)
+        nat_inside.refresh_from_db()
+
+        # Assert legacy getter behaves as expected for backwards compatibility, and that FK relationship works
+        self.assertEqual(nat_inside.nat_outside, nat_outside1)
+        self.assertEqual(nat_inside.nat_outside_list.count(), 1)
+        self.assertEqual(nat_inside.nat_outside_list.first(), nat_outside1)
+
+        # Create unassigned IPAddress
+        nat_outside2 = IPAddress.objects.create(address=netaddr.IPNetwork("192.0.2.2/24"))
+        nat_inside.nat_outside = nat_outside2
+        nat_inside.refresh_from_db()
+
+        # Test legacy setter behaves as expected for backwards compatibility and that previous FK relationship removed
+        self.assertEqual(nat_inside.nat_outside, nat_outside2)
+        self.assertEqual(nat_inside.nat_outside_list.count(), 1)
+        self.assertEqual(nat_inside.nat_outside_list.first(), nat_outside2)
+
+        # Create IPAddress with nat_inside assigned, setting up current 1-to-many relationship
+        nat_outside3 = IPAddress.objects.create(address=netaddr.IPNetwork("192.0.2.3/24"), nat_inside=nat_inside)
+        nat_inside.refresh_from_db()
+
+        # Now ensure safeguards are in place when using legacy methods with 1-to-many relationships
+        with self.assertRaises(IPAddress.NATOutsideMultipleObjectsReturned):
+            nat_inside.nat_outside
+        with self.assertRaises(IPAddress.NATOutsideMultipleObjectsReturned):
+            nat_inside.nat_outside = nat_outside1
+
+        # Assert FK relationship behaves as expected
+        self.assertEqual(nat_inside.nat_outside_list.count(), 2)
+        self.assertEqual(nat_inside.nat_outside_list.first(), nat_outside2)
+        self.assertEqual(nat_inside.nat_outside_list.last(), nat_outside3)
+
+    @override_settings(ENFORCE_GLOBAL_UNIQUE=True)
+    def test_not_null_assigned_object_type_and_null_assigned_object_id(self):
+        site = Site.objects.create(name="Test Site 1", slug="test-site-1")
+        manufacturer = Manufacturer.objects.create(name="Test Manufacturer 1", slug="test-manufacturer-1")
+        devicetype = DeviceType.objects.create(
+            manufacturer=manufacturer,
+            model="Test Device Type 1",
+            slug="test-device-type-1",
+        )
+        devicerole = DeviceRole.objects.create(name="Test Device Role 1", slug="test-device-role-1", color="ff0000")
+        device_status = Status.objects.get_for_model(Device).get(slug="active")
+        device = Device.objects.create(
+            device_type=devicetype,
+            device_role=devicerole,
+            name="TestDevice1",
+            site=site,
+            status=device_status,
+        )
+        interface = Interface.objects.create(device=device, name="eth0")
+        ipaddress_1 = IPAddress(
+            address=netaddr.IPNetwork("192.0.2.1/24"),
+            role=IPAddressRoleChoices.ROLE_VIP,
+            assigned_object_id=interface.id,
+        )
+
+        self.assertRaises(ValidationError, ipaddress_1.clean)
+
+        # Test IPAddress.clean() raises no exception if assigned_object_id and assigned_object_type
+        # are both provided
+        ipaddress_2 = IPAddress(
+            address=netaddr.IPNetwork("192.0.2.1/24"),
+            role=IPAddressRoleChoices.ROLE_VIP,
+            assigned_object_id=interface.id,
+            assigned_object_type=ContentType.objects.get_for_model(Interface),
+        )
+        self.assertIsNone(ipaddress_2.clean())
 
 
 class TestVLANGroup(TestCase):
