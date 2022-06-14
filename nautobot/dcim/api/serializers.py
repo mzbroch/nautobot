@@ -1215,17 +1215,15 @@ class InventoryItemSerializer(TaggedObjectSerializer, CustomFieldModelSerializer
 # Cables
 #
 
-# Legacy Cable serializer
+
 class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, CustomFieldModelSerializer):
     # TODO(mzb): How to handle situations with more than 2 endpoints ?
     #  - we should redirect to newer api version?
     url = serializers.HyperlinkedIdentityField(view_name="dcim-api:cable-detail")
-    termination_a_type = serializers.SerializerMethodField(read_only=True)
-    # ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))
-    termination_b_type = serializers.SerializerMethodField(read_only=True)
-    # ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))
-    termination_a = serializers.SerializerMethodField(read_only=True)
-    termination_b = serializers.SerializerMethodField(read_only=True)
+    termination_a_type = serializers.SerializerMethodField(read_only=True)  # ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # 1.2
+    termination_b_type = serializers.SerializerMethodField(read_only=True)  # ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # 1.2
+    termination_a = serializers.SerializerMethodField(read_only=True)  # 1.2
+    termination_b = serializers.SerializerMethodField(read_only=True)  # 1.2
     length_unit = ChoiceField(choices=CableLengthUnitChoices, allow_blank=True, required=False)
 
     class Meta:
@@ -1251,6 +1249,32 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
         ]
         opt_in_fields = ["computed_fields"]
 
+    # Purely for v1.2:
+    # calling type & id should result in an endpoint creation.
+    def create(self, validated_data):
+        # 1. pop the termination_a, termination_b from validated data
+        # 2. create new instances of CableEndpoint.
+        termination_a_type = validated_data.pop('termination_a_type')
+        termination_b_type = validated_data.pop('termination_b_type')
+        termination_a_id = validated_data.pop('termination_a_id')
+        termination_b_id = validated_data.pop('termination_b_id')
+
+        cable = Cable.objects.create(**validated_data)
+        # TODO(mzb): create termination a/b
+
+        return cable
+
+    def update(self):
+        pass
+
+    def get_termination_a_type(self, obj):
+        termination_type = obj.endpoints.filter(side__in=['A', 'a']).first().termination_type
+        return str(termination_type)
+
+    def get_termination_b_type(self, obj):
+        termination_type = obj.endpoints.filter(side__in=['A', 'a']).first().termination_type
+        return str(termination_type)
+
     def _get_termination(self, obj, side):
         """
         Serialize a nested representation of a termination.
@@ -1267,30 +1291,6 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
 
         return data
 
-    def _get_termination_type(self, obj, side):
-        """
-        Serialize type of a termination.
-        """
-        if side.lower() not in ["a", "b", "z"]:
-            raise ValueError("Termination side must be either A or B.")
-        termination_type = obj.endpoints.filter(side=side).first().termination_type
-        if termination_type is None:
-            return None
-        # serializer = get_serializer_for_model(termination, prefix="Nested")
-        context = {"request": self.context["request"]}
-        # data = serializer(termination, context=context).data
-
-        return data
-
-    @swagger_serializer_method(serializer_or_field=serializers.DictField)
-    def get_termination_a_type(self, obj):
-        return self._get_termination_type(obj, "A")
-
-    @swagger_serializer_method(serializer_or_field=serializers.DictField)
-    def get_termination_b_type(self, obj):
-        return self._get_termination_type(obj, "A")
-
-    @swagger_serializer_method(serializer_or_field=serializers.DictField)
     @extend_schema_field(serializers.DictField(allow_null=True))
     def get_termination_a(self, obj):
         return self._get_termination(obj, "A")
