@@ -14,7 +14,7 @@ from nautobot.core.api import (
 )
 
 from nautobot.dcim.choices import (
-CableEndpointSideChoices,
+    CableEndpointSideChoices,
     CableLengthUnitChoices,
     ConsolePortTypeChoices,
     DeviceFaceChoices,
@@ -1242,7 +1242,7 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
             "termination_b_type",
             "termination_b_id",
             "termination_b",
-            "terminations",
+            "cable_endpoints",
             "type",
             "status",
             "label",
@@ -1340,17 +1340,29 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
 
 class CableEndpointSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, CustomFieldModelSerializer):
     # url = serializers.HyperlinkedIdentityField(view_name="dcim-api:cableendpoint-detail")
-    # termination_type = ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # -> get
-    # termination = serializers.SerializerMethodField(read_only=True)
+    termination_type = ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # -> get
+    termination = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = CableEndpoint
         fields = [
             "id",
             "url",
-            # "termination_type",
-            # "termination",
+            "termination_type",
+            "termination_id",
+            "termination",
         ]
+
+    def get_termination(self, obj):
+        """
+        Serialize a nested representation of a termination.
+        """
+        termination = obj.termination
+        serializer = get_serializer_for_model(termination, prefix="Nested")
+        context = {"request": self.context["request"]}
+        data = serializer(termination, context=context).data
+
+        return data
 
 
 class TracedCableSerializer(StatusModelSerializerMixin, serializers.ModelSerializer):
