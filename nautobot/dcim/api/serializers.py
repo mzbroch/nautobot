@@ -1229,6 +1229,7 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
     termination_a = serializers.SerializerMethodField(read_only=True)  # 1.2
     termination_b = serializers.SerializerMethodField(read_only=True)  # 1.2
     length_unit = ChoiceField(choices=CableLengthUnitChoices, allow_blank=True, required=False)
+    cable_endpoints = NestedCableEndpointSerializer(read_only=True, many=True, source="endpoints")
 
     class Meta:
         model = Cable
@@ -1241,6 +1242,7 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
             "termination_b_type",
             "termination_b_id",
             "termination_b",
+            "terminations",
             "type",
             "status",
             "label",
