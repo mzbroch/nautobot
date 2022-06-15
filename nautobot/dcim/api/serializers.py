@@ -1253,9 +1253,6 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
         ]
         opt_in_fields = ["computed_fields"]
 
-    def validate_termination_a_type(self, obj):
-        return obj
-
     # Purely for v1.2 compat:
     # calling type & id should result in an endpoint creation.
     def create(self, validated_data):
@@ -1311,15 +1308,19 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
         """
         if side.lower() not in ["a", "b"]:
             raise ValueError("Termination side must be either A or B.")
-        # termination = getattr(obj, "termination_{}".format(side.lower()))
+
         if side.lower() == 'a':
             side = CableEndpointSideChoices.SIDE_A
         elif side.lower() == 'b':
             side = CableEndpointSideChoices.SIDE_Z
 
-        termination = obj.endpoints.filter(side=side).first().termination  # TODO(mzb): How do get rid of `first()`
-        if termination is None:
+        cable_endpoint = obj.endpoints.filter(side=side).first()  # TODO(mzb): How to get rid of `first()`
+
+        if cable_endpoint:
+            termination = cable_endpoint.termination
+        else:
             return None
+
         serializer = get_serializer_for_model(termination, prefix="Nested")
         context = {"request": self.context["request"]}
         data = serializer(termination, context=context).data
@@ -1347,24 +1348,7 @@ class CableEndpointSerializer(TaggedObjectSerializer, StatusModelSerializerMixin
             "url",
             # "termination_type",
             # "termination",
-
-            # "termination_a_type",
-            # "termination_a_id",
-            # "termination_a",
-            # "termination_b_type",
-            # "termination_b_id",
-            # "termination_b",
-            # "type",
-            # "status",
-            # "label",
-            # "color",
-            # "length",
-            # "length_unit",
-            # "tags",
-            # "custom_fields",
-            # "computed_fields",
         ]
-        # opt_in_fields = ["computed_fields"]
 
 
 class TracedCableSerializer(StatusModelSerializerMixin, serializers.ModelSerializer):
