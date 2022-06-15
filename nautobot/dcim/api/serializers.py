@@ -2,6 +2,7 @@ from django.contrib.contenttypes.models import ContentType
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
+from django.db import transaction
 
 from nautobot.core.api import (
     ChoiceField,
@@ -13,6 +14,7 @@ from nautobot.core.api import (
 )
 
 from nautobot.dcim.choices import (
+CableEndpointSideChoices,
     CableLengthUnitChoices,
     ConsolePortTypeChoices,
     DeviceFaceChoices,
@@ -1220,8 +1222,10 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
     # TODO(mzb): How to handle situations with more than 2 endpoints ?
     #  - we should redirect to newer api version?
     url = serializers.HyperlinkedIdentityField(view_name="dcim-api:cable-detail")
-    termination_a_type = serializers.SerializerMethodField(read_only=True)  # ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # 1.2
-    termination_b_type = serializers.SerializerMethodField(read_only=True)  # ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # 1.2
+    termination_a_type = ContentTypeField(read_only=True, source="_legacy_termination_a_type")
+    termination_b_type = ContentTypeField(read_only=True, source="_legacy_termination_b_type")  # ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # 1.2
+    termination_a_id = serializers.CharField(read_only=True, allow_null=False, source="_legacy_termination_a_id")
+    termination_b_id = serializers.CharField(read_only=True, allow_null=False, source="_legacy_termination_b_id")
     termination_a = serializers.SerializerMethodField(read_only=True)  # 1.2
     termination_b = serializers.SerializerMethodField(read_only=True)  # 1.2
     length_unit = ChoiceField(choices=CableLengthUnitChoices, allow_blank=True, required=False)
@@ -1232,10 +1236,10 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
             "id",
             "url",
             "termination_a_type",
-            # "termination_a_id",
+            "termination_a_id",
             "termination_a",
             "termination_b_type",
-            # "termination_b_id",
+            "termination_b_id",
             "termination_b",
             "type",
             "status",
@@ -1249,39 +1253,70 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
         ]
         opt_in_fields = ["computed_fields"]
 
-    # Purely for v1.2:
+    def validate_termination_a_type(self, obj):
+        return obj
+
+    # Purely for v1.2 compat:
     # calling type & id should result in an endpoint creation.
     def create(self, validated_data):
-        # 1. pop the termination_a, termination_b from validated data
-        # 2. create new instances of CableEndpoint.
-        termination_a_type = validated_data.pop('termination_a_type')
-        termination_b_type = validated_data.pop('termination_b_type')
-        termination_a_id = validated_data.pop('termination_a_id')
-        termination_b_id = validated_data.pop('termination_b_id')
+        # TODO(mzb):  For 1.2 disable creating via list of terminations in a nested serializer
+        #            and terminations.add (obj manager?)
 
-        cable = Cable.objects.create(**validated_data)
-        # TODO(mzb): create termination a/b
+        # TODO(mzb): Self Validate initial data for 4 keys below.
+
+        # 1. Get the details from self.initial_data - is this the only one way ?
+        # 2. create new instances of CableEndpoint.
+        termination_a_type = self.initial_data['termination_a_type']  # Can we get it from validated_data somehow ?
+        termination_b_type = self.initial_data['termination_b_type']
+        termination_a_id = self.initial_data['termination_a_id']
+        termination_b_id = self.initial_data['termination_b_id']
+
+        # PoC shortcut.
+        _app_label, _model = termination_a_type.split(".")[0], termination_a_type.split(".")[1]  # TODO(mzb): FIXME
+
+        with transaction.atomic():
+            cable = Cable.objects.create(**validated_data)
+            cable.validated_save()
+
+            endpoint_a = CableEndpoint.objects.create(
+                cable=cable,
+                side=CableEndpointSideChoices.SIDE_A,
+                termination_id=termination_a_id,
+                termination_type=ContentType.objects.get(  # TODO(mzb): FIXME, PoC
+                    app_label=_app_label,
+                    model=_model,
+                ),
+            )
+            endpoint_b = CableEndpoint.objects.create(
+                cable=cable,
+                side=CableEndpointSideChoices.SIDE_Z,
+                termination_id=termination_b_id,
+                termination_type=ContentType.objects.get(  # TODO(mzb): FIXME, PoC
+                    app_label=_app_label,
+                    model=_model,
+                ),
+            )
+
+            endpoint_a.validated_save()
+            endpoint_b.validated_save()
 
         return cable
 
     def update(self):
         pass
 
-    def get_termination_a_type(self, obj):
-        termination_type = obj.endpoints.filter(side__in=['A', 'a']).first().termination_type
-        return str(termination_type)
-
-    def get_termination_b_type(self, obj):
-        termination_type = obj.endpoints.filter(side__in=['A', 'a']).first().termination_type
-        return str(termination_type)
-
     def _get_termination(self, obj, side):
         """
         Serialize a nested representation of a termination.
         """
-        if side.lower() not in ["a", "b", "z"]:
+        if side.lower() not in ["a", "b"]:
             raise ValueError("Termination side must be either A or B.")
         # termination = getattr(obj, "termination_{}".format(side.lower()))
+        if side.lower() == 'a':
+            side = CableEndpointSideChoices.SIDE_A
+        elif side.lower() == 'b':
+            side = CableEndpointSideChoices.SIDE_Z
+
         termination = obj.endpoints.filter(side=side).first().termination  # TODO(mzb): How do get rid of `first()`
         if termination is None:
             return None
@@ -1293,11 +1328,11 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
 
     @extend_schema_field(serializers.DictField(allow_null=True))
     def get_termination_a(self, obj):
-        return self._get_termination(obj, "A")
+        return self._get_termination(obj, "a")
 
     @extend_schema_field(serializers.DictField(allow_null=True))
     def get_termination_b(self, obj):
-        return self._get_termination(obj, "A")
+        return self._get_termination(obj, "b")
 
 
 class CableEndpointSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, CustomFieldModelSerializer):
@@ -1310,8 +1345,9 @@ class CableEndpointSerializer(TaggedObjectSerializer, StatusModelSerializerMixin
         fields = [
             "id",
             "url",
-            "termination_type",
-            "termination",
+            # "termination_type",
+            # "termination",
+
             # "termination_a_type",
             # "termination_a_id",
             # "termination_a",

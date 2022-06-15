@@ -25,6 +25,7 @@ from nautobot.utilities.utils import to_meters
 from .devices import Device
 from .device_components import FrontPort, RearPort
 
+
 __all__ = (
     "Cable",
     "CablePath",
@@ -282,6 +283,33 @@ class Cable(PrimaryModel, StatusModel):
         if self.termination_a is None:
             return
         return COMPATIBLE_TERMINATION_TYPES[self.termination_a._meta.model_name]
+
+
+    def _legacy_termination_a_type(self):
+        _termination_a = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_A).first()
+
+        if _termination_a:
+            return _termination_a.termination_type
+
+    def _legacy_termination_b_type(self):
+        _termination_b = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z).first()
+
+        if _termination_b:
+            return _termination_b.termination_type
+
+    @property
+    def _legacy_termination_a_id(self):
+        _termination_a = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_A).first()
+
+        if _termination_a:
+            return _termination_a.termination_id
+
+    @property
+    def _legacy_termination_b_id(self):
+        _termination_b = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z).first()
+
+        if _termination_b:
+            return _termination_b.termination_id
 
 
 class CableEndpoint(BaseModel):

@@ -3315,7 +3315,6 @@ class ConnectCableToDeviceForm(BootstrapMixin, CustomFieldModelForm):
     #         "rack_id": "$termination_b_rack",
     #     },
     # )
-    tags = DynamicModelMultipleChoiceField(queryset=Tag.objects.all(), required=False)
 
     class Meta:
         model = Cable
