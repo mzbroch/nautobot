@@ -1229,7 +1229,7 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
     termination_a = serializers.SerializerMethodField(read_only=True)  # 1.2
     termination_b = serializers.SerializerMethodField(read_only=True)  # 1.2
     length_unit = ChoiceField(choices=CableLengthUnitChoices, allow_blank=True, required=False)
-    cable_endpoints = NestedCableEndpointSerializer(read_only=True, many=True, source="endpoints")
+    cable_endpoints = NestedCableEndpointSerializer(required=False, many=True, source="endpoints")
 
     class Meta:
         model = Cable
@@ -1254,6 +1254,17 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
             "computed_fields",
         ]
         opt_in_fields = ["computed_fields"]
+
+    # def create(self, validated_data):
+    #     cable_endpoints_data = validated_data.pop('cable_endpoints')
+    #     cable = Cable.objects.create(**validated_data)
+    #
+    #     for ce_data in cable_endpoints_data:
+    #         cable_endpoint = CableEndpoint.objects.create(**ce_data)
+    #         cable_endpoint.cable = cable
+    #         cable_endpoint.save()
+    #
+    #     return cable
 
     # Purely for v1.2 compat:
     # calling type & id should result in an endpoint creation.
@@ -1339,7 +1350,7 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
 
 
 class CableEndpointSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, CustomFieldModelSerializer):
-    # url = serializers.HyperlinkedIdentityField(view_name="dcim-api:cableendpoint-detail")
+    url = serializers.HyperlinkedIdentityField(view_name="dcim-api:cableendpoint-detail")
     termination_type = ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # -> get
     termination = serializers.SerializerMethodField(read_only=True)
 

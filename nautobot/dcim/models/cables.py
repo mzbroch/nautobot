@@ -284,7 +284,6 @@ class Cable(PrimaryModel, StatusModel):
             return
         return COMPATIBLE_TERMINATION_TYPES[self.termination_a._meta.model_name]
 
-
     def _legacy_termination_a_type(self):
         _termination_a = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_A).first()
 
