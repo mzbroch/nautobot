@@ -140,6 +140,19 @@ We've updated the Jinja2 dependency from version 2.11 to version 3.0.3. This may
 
 As Python 3.6 has reached end-of-life, and many of Nautobot's dependencies have already dropped support for Python 3.6 as a consequence, Nautobot 1.3 and later do not support installation under Python 3.6.
 
+## v1.3.7 (2022-MM-DD)
+
+### Added
+
+### Changed
+
+- [#1645](https://github.com/nautobot/nautobot/issues/1645) - Hide Search Bar if No AuthN and hide_restricted_ui is True
+
+### Fixed
+
+- [#1677](https://github.com/nautobot/nautobot/issues/1677) - Fixed nested CustomFields (ex: on Interface) default value not applying upon Device creation.
+- [#1769](https://github.com/nautobot/nautobot/issues/1769) - Resolve missing menu 'General / Installed Plugins' in navbar if HIDE RESTRICTED UI is activated
+
 ## v1.3.6 (2022-06-13)
 
 ### Changed
