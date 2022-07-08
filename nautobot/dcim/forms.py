@@ -59,6 +59,7 @@ from nautobot.utilities.forms.constants import BOOLEAN_WITH_BLANK_CHOICES
 from nautobot.virtualization.models import Cluster, ClusterGroup
 from .choices import (
     CableLengthUnitChoices,
+    CableEndpointSideChoices,
     CableTypeChoices,
     ConsolePortTypeChoices,
     DeviceFaceChoices,
@@ -3316,6 +3317,34 @@ class ConnectCableToDeviceForm(BootstrapMixin, CustomFieldModelForm):
     #     },
     # )
 
+    def save(self, commit=True):
+        """Save."""
+        cable = super().save(commit)
+
+        termination_b_type = self.__class__.termination_b_type
+        termination_b_id = self.cleaned_data["termination_b_id"]
+        termination = termination_b_type.objects.get(pk=termination_b_id)
+
+        cable.endpoints.create(termination=termination)
+
+        return cable
+
+        # if commit:
+        #     interface=
+        #     cable.endpoints.add(termination=termination_a)
+        #     cable.endpoints.add(termination=termination_b)
+        #     # # Initiate local templates as indicated in the creation form.
+        #     # # Templates are only created during object creation.
+        #     # for t in self.cleaned_data.get("template", []):  # pylint: disable=invalid-name
+        #     #     models.PeerGroup.objects.create(
+        #     #         name=t.name,
+        #     #         template=t,
+        #     #         routing_instance=obj,
+        #     #     )
+        #
+        # return obj
+
+
     class Meta:
         model = Cable
         fields = [
@@ -3382,6 +3411,7 @@ class ConnectCableToPowerOutletForm(ConnectCableToDeviceForm):
 
 
 class ConnectCableToInterfaceForm(ConnectCableToDeviceForm):
+    termination_b_type = Interface
     termination_b_id = DynamicModelChoiceField(
         queryset=Interface.objects.all(),
         label="Name",
@@ -3505,6 +3535,159 @@ class ConnectCableToPowerFeedForm(BootstrapMixin, CustomFieldModelForm):
     def clean_termination_b_id(self):
         # Return the PK rather than the object
         return getattr(self.cleaned_data["termination_b_id"], "pk", None)
+
+from nautobot.dcim.models import CableEndpoint
+class CableEndpointForm(BootstrapMixin, CustomFieldModelForm):
+    # def __init__(self, *args, **kwargs):
+    #     """Init."""
+    #     super().__init__(*args, **kwargs)
+    #
+    #     # if self.initial.get("device"):
+    #     #     self.fields["device"].disabled = True
+    #     #     self.fields.pop("template")
+    #     #     self.fields["routing_instance"].disabled = True
+
+    # termination_type = forms.ModelMultipleChoiceField(queryset=ContentType.objects.all())
+
+    class Meta:
+        model = CableEndpoint
+        fields = [
+            # "termination_type",
+            # "termination_id",
+            # "cable",
+            # "side",
+        ]
+        # widgets = {
+        #     "type": StaticSelect2,
+        #     "length_unit": StaticSelect2,
+        # }
+        # error_messages = {"length": {"max_value": "Maximum length is 32767 (any unit)"}}
+
+
+class CableInterfaceEndpointForm(BootstrapMixin, CustomFieldModelForm):
+    def __init__(self, *args, **kwargs):
+        """Init."""
+        super().__init__(*args, **kwargs)
+
+        if self.initial.get("termination"):
+            termination = self.initial.get("termination")
+
+            # Assign the termination to the instance
+            self.instance.termination = termination
+
+            # Hide the termination field
+            self.fields["termination"].widget = forms.HiddenInput()
+
+            self.fields["termination_id"].initial = termination.pk
+            self.fields["termination_type"].initial = ContentType.objects.get_for_model(termination)
+
+            # self.fields["termination_device"].initial = termination.device
+            # self.fields["termination_site"].initial = termination.device.site
+            # self.fields["termination_region"].initial = termination.device.site.region
+            # self.fields["termination"].initial = termination
+
+            # # # Disable all fields if initial termination
+            # for field in self.fields:
+            #     self.fields[field].disabled = True
+
+        # if self.initial.get("side"):
+        #     _side = self.initial.get("side")
+        #     self.fields["side"].initial = _side
+
+        # TODO(mzb): This needs some refactor. It rewrites query params if prefix is defined on the Form.
+        _prefix = f"{self.prefix}-" if self.prefix else ""
+        if _prefix:
+            for field in self.fields:
+                if hasattr(self.fields[field], "query_params"):
+                    for qp_name, qp_val in self.fields[field].query_params.items():
+                        if qp_val.startswith("$") and hasattr(self.fields[field], "widget"):
+                            _qp_val = qp_val.lstrip("$")
+                            if f"data-query-param-{qp_name}" in self.fields[field].widget.attrs:
+                                self.fields[field].widget.attrs.pop(f"data-query-param-{qp_name}", None)
+                                self.fields[field].widget.add_query_param(name=qp_name, value=f"${_prefix}{_qp_val}")
+                            # self.fields[field].widget.attrs['readonly'] = True
+
+        # self.fields["termination"].widget.attrs['disabled'] = 'disabled'
+        # self.fields["side"].widget.attrs['readonly']= True
+        # import pdb
+        # pdb.set_trace()
+
+    # def save(self, *args, **kwargs):
+    #     if self.instance.termination:
+    #         self.instance.termination_id = self.instance.termination.pk
+    #         self.instance.termination_type = ContentType.objects.get(model=self.instance.__class_.model)
+    #
+    #     super().__init__(*args, **kwargs)
+
+    def clean(self, *args, **kwargs):
+        # super().__init__(*args, **kwargs)
+
+        # self.cleaned_data.pop('termination_region')
+        # self.cleaned_data.pop('termination_site')
+        # self.cleaned_data.pop('termination_device')
+        # self.cleaned_data.pop('termination_rack')
+        # self.cleaned_data.pop('side')
+        self.cleaned_data["termination_type"] = ContentType.objects.get_for_model(
+            self.cleaned_data["termination"]
+        )
+        self.cleaned_data["termination_id"] = self.cleaned_data["termination"].pk
+
+        return super().clean()
+
+    termination_region = DynamicModelChoiceField(
+        queryset=Region.objects.all(),
+        label="Region",
+        required=False,
+    )
+    termination_site = DynamicModelChoiceField(
+        queryset=Site.objects.all(),
+        label="Site",
+        required=False,
+        query_params={"region_id": "$termination_region"},
+    )
+    termination_rack = DynamicModelChoiceField(
+        queryset=Rack.objects.all(),
+        label="Rack",
+        required=False,
+        null_option="None",
+        query_params={"site_id": "$termination_site"},
+    )
+    termination_device = DynamicModelChoiceField(
+        queryset=Device.objects.all(),
+        label="Device",
+        required=False,
+        query_params={
+            "site_id": "$termination_site",
+            "rack_id": "$termination_rack",
+        },
+    )
+    termination = DynamicModelChoiceField(
+        queryset=Interface.objects.all(),
+        label="Name",
+        # disabled_indicator="cable",
+        query_params={
+            "device_id": "$termination_device",
+            "kind": "physical",
+        },
+    )
+    side = forms.ChoiceField(choices=CableEndpointSideChoices, widget=forms.HiddenInput())
+    termination_type = forms.ModelChoiceField(
+        queryset=ContentType.objects.all(),
+        widget=forms.HiddenInput(),
+    )
+    # termination_id = forms.UUIDField()
+    class Meta:
+        model = CableEndpoint
+        fields = [
+            "termination_region",
+            "termination_site",
+            "termination_device",
+            "termination",
+            "side",
+            "termination_type",
+            "termination_id",
+        ]
+        # hidden_fields = ["side"]
 
 
 class CableForm(BootstrapMixin, CustomFieldModelForm):

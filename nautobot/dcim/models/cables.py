@@ -89,10 +89,6 @@ class Cable(PrimaryModel, StatusModel):
     # )
 
     csv_headers = [
-        # "termination_a_type",
-        # "termination_a_id",
-        # "termination_b_type",
-        # "termination_b_id",
         "type",
         "status",
         "label",
@@ -100,18 +96,6 @@ class Cable(PrimaryModel, StatusModel):
         "length",
         "length_unit",
     ]
-
-    # class Meta:
-    #     ordering = [
-    #         "termination_a_type",
-    #         "termination_a_id",
-    #         "termination_b_type",
-    #         "termination_b_id",
-    #     ]
-    #     unique_together = (
-    #         ("termination_a_type", "termination_a_id"),
-    #         ("termination_b_type", "termination_b_id"),
-    #     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -284,32 +268,6 @@ class Cable(PrimaryModel, StatusModel):
             return
         return COMPATIBLE_TERMINATION_TYPES[self.termination_a._meta.model_name]
 
-    def _legacy_termination_a_type(self):
-        _termination_a = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_A).first()
-
-        if _termination_a:
-            return _termination_a.termination_type
-
-    def _legacy_termination_b_type(self):
-        _termination_b = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z).first()
-
-        if _termination_b:
-            return _termination_b.termination_type
-
-    @property
-    def _legacy_termination_a_id(self):
-        _termination_a = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_A).first()
-
-        if _termination_a:
-            return _termination_a.termination_id
-
-    @property
-    def _legacy_termination_b_id(self):
-        _termination_b = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z).first()
-
-        if _termination_b:
-            return _termination_b.termination_id
-
 
 class CableEndpoint(BaseModel):
     cable = models.ForeignKey(
@@ -324,9 +282,9 @@ class CableEndpoint(BaseModel):
         to=ContentType,
         limit_choices_to=CABLE_TERMINATION_MODELS,
         on_delete=models.PROTECT,
-        related_name="+",
+        related_name="+", blank=True, null=True,
     )
-    termination_id = models.UUIDField()
+    termination_id = models.UUIDField(blank=True, null=True)
     termination = GenericForeignKey(ct_field="termination_type", fk_field="termination_id")
 
     def clean(self):

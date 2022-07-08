@@ -6,8 +6,10 @@
 {% block content %}
 <form method="post" class="form form-horizontal">
     {% csrf_token %}
+    {% for form in forms %}
     {% for field in form.hidden_fields %}
         {{ field }}
+    {% endfor %}
     {% endfor %}
     {% if form.non_field_errors %}
         <div class="row">
@@ -21,7 +23,7 @@
             </div>
         </div>
     {% endif %}
-    {% with termination_a=form.instance.termination_a %}
+    {% with termination_a=termination_a_form.instance.termination %}
         <h3>{% block title %}Connect {{ termination_a.device }} {{ termination_a }} to {{ termination_b_type|bettertitle }}{% endblock %}</h3>
         <div class="row">
             <div class="col-md-5">
@@ -65,7 +67,13 @@
                             <div class="form-group">
                                 <label class="col-md-3 control-label required">Name</label>
                                 <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a }}</p>
+                                    <p class="form-control-static">{{ termination_a.name }}</p>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-md-3 control-label required">Side</label>
+                                <div class="col-md-9">
+                                    <p class="form-control-static">A</p>
                                 </div>
                             </div>
                         {% else %}
@@ -101,6 +109,9 @@
             <div class="col-md-2 text-center" style="padding-top: 90px;">
                 <i class="mdi mdi-swap-horizontal-bold mdi-48px"></i>
             </div>
+            <!-- mzb -->
+            {{ termination_b_formset.management_form }}
+            {% for termination_z_form in termination_b_formset %}
             <div class="col-md-5">
                 <div class="panel panel-default">
                     <div class="panel-heading text-center">
@@ -114,47 +125,39 @@
                                 {% endfor %}
                             </ul>
                         {% endif %}
-                        {% if 'termination_b_provider' in form.fields %}
-                            {% render_field form.termination_b_provider %}
+                        {% if 'termination_provider' in termination_z_form.fields %}
+                            {% render_field termination_z_form.termination_provider %}
                         {% endif %}
-                        {% if 'termination_b_region' in form.fields %}
-                            {% render_field form.termination_b_region %}
+                        {% if 'termination_region' in termination_z_form.fields %}
+                            {% render_field termination_z_form.termination_region %}
                         {% endif %}
-                        {% if 'termination_b_site' in form.fields %}
-                            {% render_field form.termination_b_site %}
+                        {% if 'termination_site' in termination_z_form.fields %}
+                            {% render_field termination_z_form.termination_site %}
                         {% endif %}
-                        {% if 'termination_b_rackgroup' in form.fields %}
-                            {% render_field form.termination_b_rackgroup %}
+                        {% if 'termination_rackgroup' in termination_z_form.fields %}
+                            {% render_field termination_z_form.termination_rackgroup %}
                         {% endif %}
-                        {% if 'termination_b_rack' in form.fields %}
-                            {% render_field form.termination_b_rack %}
+                        {% if 'termination_rack' in termination_z_form.fields %}
+                            {% render_field termination_z_form.termination_rack %}
                         {% endif %}
-                        {% if 'termination_b_device' in form.fields %}
-                            {% render_field form.termination_b_device %}
+                        {% if 'termination_device' in termination_z_form.fields %}
+                            {% render_field termination_z_form.termination_device %}
                         {% endif %}
-                        {% if 'termination_b_type' in form.fields %}
-                            {% render_field form.termination_b_type %}
+                        {% if 'termination_powerpanel' in termination_z_form.fields %}
+                            {% render_field termination_z_form.termination_powerpanel %}
                         {% endif %}
-                        {% if 'termination_b_powerpanel' in form.fields %}
-                            {% render_field form.termination_b_powerpanel %}
+                        {% if 'termination_circuit' in termination_z_form.fields %}
+                            {% render_field termination_z_form.termination_circuit %}
                         {% endif %}
-                        {% if 'termination_b_circuit' in form.fields %}
-                            {% render_field form.termination_b_circuit %}
-                        {% endif %}
-                        <div class="form-group">
-                            <label class="col-md-3 control-label required">Type</label>
-                            <div class="col-md-9">
-                                <p class="form-control-static">{{ termination_b_type|capfirst }}</p>
-                            </div>
-                        </div>
-                        {% render_field form.termination_b_id %}
+                        {% render_field termination_z_form.termination %}
                     </div>
                 </div>
             </div>
+            {% endfor %}
         </div>
         <div class="row">
             <div class="col-md-6 col-md-offset-3">
-                {% include 'dcim/inc/cable_form.html' %}
+                {% include 'dcim/inc/cable_form.html' with form=cable_form%}
             </div>
         </div>
         <div class="form-group">

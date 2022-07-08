@@ -1219,30 +1219,16 @@ class InventoryItemSerializer(TaggedObjectSerializer, CustomFieldModelSerializer
 
 
 class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, CustomFieldModelSerializer):
-    # TODO(mzb): How to handle situations with more than 2 endpoints ?
-    #  - we should redirect to newer api version?
     url = serializers.HyperlinkedIdentityField(view_name="dcim-api:cable-detail")
-    termination_a_type = ContentTypeField(read_only=True, source="_legacy_termination_a_type")
-    termination_b_type = ContentTypeField(read_only=True, source="_legacy_termination_b_type")  # ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # 1.2
-    termination_a_id = serializers.CharField(read_only=True, allow_null=False, source="_legacy_termination_a_id")
-    termination_b_id = serializers.CharField(read_only=True, allow_null=False, source="_legacy_termination_b_id")
-    termination_a = serializers.SerializerMethodField(read_only=True)  # 1.2
-    termination_b = serializers.SerializerMethodField(read_only=True)  # 1.2
     length_unit = ChoiceField(choices=CableLengthUnitChoices, allow_blank=True, required=False)
-    cable_endpoints = NestedCableEndpointSerializer(required=False, many=True, source="endpoints")
+    endpoints = NestedCableEndpointSerializer(required=False, many=True)
 
     class Meta:
         model = Cable
         fields = [
             "id",
             "url",
-            "termination_a_type",
-            "termination_a_id",
-            "termination_a",
-            "termination_b_type",
-            "termination_b_id",
-            "termination_b",
-            "cable_endpoints",
+            "endpoints",
             "type",
             "status",
             "label",
@@ -1255,60 +1241,14 @@ class CableSerializer(TaggedObjectSerializer, StatusModelSerializerMixin, Custom
         ]
         opt_in_fields = ["computed_fields"]
 
-    # def create(self, validated_data):
-    #     cable_endpoints_data = validated_data.pop('cable_endpoints')
-    #     cable = Cable.objects.create(**validated_data)
-    #
-    #     for ce_data in cable_endpoints_data:
-    #         cable_endpoint = CableEndpoint.objects.create(**ce_data)
-    #         cable_endpoint.cable = cable
-    #         cable_endpoint.save()
-    #
-    #     return cable
-
-    # Purely for v1.2 compat:
-    # calling type & id should result in an endpoint creation.
     def create(self, validated_data):
-        # TODO(mzb):  For 1.2 disable creating via list of terminations in a nested serializer
-        #            and terminations.add (obj manager?)
+        cable_endpoints_data = validated_data.pop('cable_endpoints')
+        cable = Cable.objects.create(**validated_data)
 
-        # TODO(mzb): Self Validate initial data for 4 keys below.
-
-        # 1. Get the details from self.initial_data - is this the only one way ?
-        # 2. create new instances of CableEndpoint.
-        termination_a_type = self.initial_data['termination_a_type']  # Can we get it from validated_data somehow ?
-        termination_b_type = self.initial_data['termination_b_type']
-        termination_a_id = self.initial_data['termination_a_id']
-        termination_b_id = self.initial_data['termination_b_id']
-
-        # PoC shortcut.
-        _app_label, _model = termination_a_type.split(".")[0], termination_a_type.split(".")[1]  # TODO(mzb): FIXME
-
-        with transaction.atomic():
-            cable = Cable.objects.create(**validated_data)
-            cable.validated_save()
-
-            endpoint_a = CableEndpoint.objects.create(
-                cable=cable,
-                side=CableEndpointSideChoices.SIDE_A,
-                termination_id=termination_a_id,
-                termination_type=ContentType.objects.get(  # TODO(mzb): FIXME, PoC
-                    app_label=_app_label,
-                    model=_model,
-                ),
-            )
-            endpoint_b = CableEndpoint.objects.create(
-                cable=cable,
-                side=CableEndpointSideChoices.SIDE_Z,
-                termination_id=termination_b_id,
-                termination_type=ContentType.objects.get(  # TODO(mzb): FIXME, PoC
-                    app_label=_app_label,
-                    model=_model,
-                ),
-            )
-
-            endpoint_a.validated_save()
-            endpoint_b.validated_save()
+        for ce_data in cable_endpoints_data:
+            cable_endpoint = CableEndpoint.objects.create(**ce_data)
+            cable_endpoint.cable = cable
+            cable_endpoint.save()
 
         return cable
 

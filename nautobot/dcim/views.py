@@ -10,12 +10,15 @@ from django.forms import (
     MultipleHiddenInput,
     modelformset_factory,
 )
+from django.forms import formset_factory
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.views.generic import View
 from django_tables2 import RequestConfig
 
+
+from nautobot.dcim.choices import CableEndpointSideChoices
 from nautobot.circuits.models import Circuit
 from nautobot.core.views import generic
 from nautobot.extras.views import ObjectChangeLogView, ObjectConfigContextView
@@ -2344,15 +2347,15 @@ class CableCreateView(generic.ObjectEditView):
 
         # Set the model_form class based on the type of component being connected
         self.model_form = {
-            "console-port": forms.ConnectCableToConsolePortForm,
-            "console-server-port": forms.ConnectCableToConsoleServerPortForm,
-            "power-port": forms.ConnectCableToPowerPortForm,
-            "power-outlet": forms.ConnectCableToPowerOutletForm,
-            "interface": forms.ConnectCableToInterfaceForm,
-            "front-port": forms.ConnectCableToFrontPortForm,
-            "rear-port": forms.ConnectCableToRearPortForm,
-            "power-feed": forms.ConnectCableToPowerFeedForm,
-            "circuit-termination": forms.ConnectCableToCircuitTerminationForm,
+            # "console-port": forms.ConnectCableToConsolePortForm,
+            # "console-server-port": forms.ConnectCableToConsoleServerPortForm,
+            # "power-port": forms.ConnectCableToPowerPortForm,
+            # "power-outlet": forms.ConnectCableToPowerOutletForm,
+            "interface": forms.CableInterfaceEndpointForm,
+            # "front-port": forms.ConnectCableToFrontPortForm,
+            # "rear-port": forms.ConnectCableToRearPortForm,
+            # "power-feed": forms.ConnectCableToPowerFeedForm,
+            # "circuit-termination": forms.ConnectCableToCircuitTerminationForm,
         }[kwargs.get("termination_b_type")]
 
         return super().dispatch(request, *args, **kwargs)
@@ -2364,37 +2367,146 @@ class CableCreateView(generic.ObjectEditView):
         self.termination_b_type = ContentType.objects.get(model=termination_b_type_name.replace("-", ""))
 
         # Initialize Cable termination attributes
-        obj.termination_a = termination_a_type.objects.get(pk=termination_a_id)
-        obj.termination_b_type = self.termination_b_type
+        # obj.termination_a = termination_a_type.objects.get(pk=termination_a_id)
+        # obj.termination_b_type = self.termination_b_type
+
+        # obj.endpoints.create(termination=termination_a_type.objects.get(pk=termination_a_id), side="A")
+
+        from nautobot.dcim.models.cables import CableEndpoint
+        ce1 = CableEndpoint()
+        ce1.cable = obj
+        ce1.side = "A"
+
+        print(ce1)
 
         return obj
 
     def get(self, request, *args, **kwargs):
-        obj = self.alter_obj(self.get_object(kwargs), request, args, kwargs)
+        termination_a_type = kwargs.get("termination_a_type")
+        termination_a_id = kwargs.get("termination_a_id")
+        termination_a = termination_a_type.objects.get(pk=termination_a_id)
 
+        termination_b_type_name = kwargs.get("termination_b_type")
+        termination_b_type = ContentType.objects.get(model=termination_b_type_name.replace("-", ""))
+
+        cable_form = forms.CableForm(prefix="cable")
+        termination_a_form = self.model_form(
+            initial={
+                "termination": termination_a,
+                "side": CableEndpointSideChoices.SIDE_A,
+            },
+            prefix="termination_a",
+        )
+        #
+        # obj = self.alter_obj(self.get_object(kwargs), request, args, kwargs)
+        #
         # Parse initial data manually to avoid setting field values as lists
-        initial_data = {k: request.GET[k] for k in request.GET}
+        # initial_data = {k: request.GET[k] for k in request.GET}
+        termination_b_initial_data = {}
 
         # Set initial site and rack based on side A termination (if not already set)
-        termination_a_site = getattr(obj.termination_a.parent, "site", None)
-        if termination_a_site and "termination_b_region" not in initial_data:
-            initial_data["termination_b_region"] = termination_a_site.region
-        if "termination_b_site" not in initial_data:
-            initial_data["termination_b_site"] = termination_a_site
-        if "termination_b_rack" not in initial_data:
-            initial_data["termination_b_rack"] = getattr(obj.termination_a.parent, "rack", None)
+        termination_a_site = getattr(termination_a.parent, "site", None)
 
-        form = self.model_form(instance=obj, initial=initial_data)
+        if termination_a_site and ("termination_region" not in termination_b_initial_data):
+            termination_b_initial_data["termination_region"] = termination_a_site.region
+        if "termination_site" not in termination_b_initial_data:
+            termination_b_initial_data["termination_site"] = termination_a_site
+        if "termination_rack" not in termination_b_initial_data:
+            termination_b_initial_data["termination_rack"] = getattr(termination_a.parent, "rack", None)
+        if "side" not in termination_b_initial_data:
+            termination_b_initial_data["side"] = CableEndpointSideChoices.SIDE_Z
+        if "termination_type" not in termination_b_initial_data:
+            termination_b_initial_data["termination_type"] = termination_b_type
+
+        TerminationBForset = formset_factory(self.model_form, extra=0)
+        termination_b_formset = TerminationBForset(
+            prefix="termination_b",
+            initial=[termination_b_initial_data]
+        )
+        # import pdb
+        # pdb.set_trace()
 
         return render(
             request,
             self.template_name,
             {
-                "obj": obj,
-                "obj_type": Cable._meta.verbose_name,
-                "termination_b_type": self.termination_b_type.name,
-                "form": form,
-                "return_url": self.get_return_url(request, obj),
+                # "obj": obj,
+                # "obj_type": Cable._meta.verbose_name,
+                # "termination_b_type": self.termination_b_type.name,
+                "cable_form": cable_form,
+                "termination_a_form": termination_a_form,
+                "termination_b_formset": termination_b_formset,
+                "forms": [cable_form, termination_a_form] + termination_b_formset.forms,
+                # "termination_b_type_name": termination_b_type_name,
+                # "return_url": self.get_return_url(request, obj),
+            },
+        )
+
+    def post(self, request, *args, **kwargs):
+        """Post Method."""
+        from nautobot.dcim.choices import CableEndpointSideChoices
+        cable_form = forms.CableForm(request.POST, prefix="cable")
+        termination_a_form = forms.CableInterfaceEndpointForm(request.POST, prefix="termination_a")
+        # termination_z_form = forms.CableInterfaceEndpointForm(request.POST, prefix="termination_z")
+        TerminationBForset = formset_factory(self.model_form, extra=0)
+        termination_b_formset = TerminationBForset(
+            request.POST,
+            prefix="termination_b",
+        )
+
+        try:
+            if cable_form.is_valid() and termination_a_form.is_valid() and termination_b_formset.is_valid():
+                with transaction.atomic():
+                    # print(cable_form.cleaned_data)
+                    # print(termination_a_form.cleaned_data)
+                    import pdb
+                    pdb.set_trace()
+
+                    cable = cable_form.save()
+                    termination_a = termination_a_form.save(commit=False)
+                    termination_a.cable = cable
+                    termination_a.save()
+
+                    for _termination_form in termination_b_formset:
+                        _termination = _termination_form.save(commit=False)
+                        _termination.cable = cable
+                        _termination.save()
+
+                    # from nautobot.dcim.models import CableEndpoint
+                    # termination_a = termination_a_form.save()
+                    # print(termination_a)
+                    # termination_a = CableEndpoint(
+                    #     termination=termination_a_form.cleaned_data["termination"],
+                    #     side=termination_a_form.cleaned_data["side"],
+                    #     # cable=cable,
+                    # )
+                    # # termination_z = termination_z_form.save(commit=False)
+                    # for termination in [termination_a]:
+                    #     termination.cable = cable
+                    #     termination.save()
+
+                return redirect(cable.get_absolute_url())
+            else:
+                print('asdasdad')
+                # import pdb
+                # pdb.set_trace()
+
+        except Exception as error:
+            print(error)
+            cable_form.add_error(field=None, error=str(Exception))
+
+        return render(
+            request,
+            self.template_name,
+            {
+                # "obj": obj,
+                # "obj_type": Cable._meta.verbose_name,
+                # "termination_b_type": self.termination_b_type.name,
+                "cable_form": cable_form,
+                "termination_a_form": termination_a_form,
+                "termination_b_formset": termination_b_formset,
+                # "termination_b_type_name": termination_b_type_name,
+                # "return_url": self.get_return_url(request, obj),
             },
         )
 

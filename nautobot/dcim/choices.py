@@ -993,7 +993,10 @@ class CableEndpointSideChoices(ChoiceSet):
     SIDE_A = "A"
     SIDE_Z = "Z"
 
-    CHOICES = ((SIDE_A, "A"), (SIDE_Z, "Z"))
+    CHOICES = (
+        (SIDE_A, "A"),
+        (SIDE_Z, "Z"),
+    )
 
 
 class CableTypeChoices(ChoiceSet):
