@@ -1,23 +1,25 @@
 {% load helpers %}
 <table class="table table-hover panel-body attr-table">
-    {% if termination.device %}
+    {% if terminations.0.device %}
         {# Device component #}
         <tr>
             <td>Device</td>
             <td>
-                <a href="{{ termination.device.get_absolute_url }}">{{ termination.device }}</a>
+                <a href="{{ terminations.0.device.get_absolute_url }}">{{ terminations.0.device }}</a>
             </td>
         </tr>
         <tr>
             <td>Type</td>
             <td>
-                {{ termination|meta:"verbose_name"|capfirst }}
+                {{ terminations.0|meta:"verbose_name"|capfirst }}
             </td>
         </tr>
         <tr>
             <td>Component</td>
             <td>
-                <a href="{{ termination.get_absolute_url }}">{{ termination }}</a>
+                {% for termination in terminations %}
+                <a href="{{ termination.get_absolute_url }}">{{ termination }}</a>{% if not forloop.last %},{% endif %}
+                {% endfor %}
             </td>
         </tr>
     {% elif termination.power_panel %}
@@ -25,13 +27,13 @@
         <tr>
             <td>Power Panel</td>
             <td>
-                <a href="{{ termination.power_panel.get_absolute_url }}">{{ termination.power_panel }}</a>
+                <a href="{{ terminations.0.power_panel.get_absolute_url }}">{{ terminations.0.power_panel }}</a>
             </td>
         </tr>
         <tr>
             <td>Power Feed</td>
             <td>
-                <a href="{{ termination.get_absolute_url }}">{{ termination }}</a>
+                <a href="{{ terminations.0.get_absolute_url }}">{{ terminations.0 }}</a>
             </td>
         </tr>
     {% else %}
@@ -39,13 +41,15 @@
         <tr>
             <td>Provider</td>
             <td>
-                <a href="{{ termination.circuit.provider.get_absolute_url }}">{{ termination.circuit.provider }}</a>
+                <a href="{{ terminations.0.circuit.provider.get_absolute_url }}">{{ terminations.0.circuit.provider }}</a>
             </td>
         </tr>
         <tr>
             <td>Circuit</td>
             <td>
-                <a href="{{ termination.circuit.get_absolute_url }}">{{ termination.circuit }}</a> ({{ termination }})
+                {% for termination in terminations %}
+                <a href="{{ termination.circuit.get_absolute_url }}">{{ termination.circuit }}</a> ({{ termination }}){% if not forloop.last %},{% endif %}
+                {% endfor %}
             </td>
         </tr>
     {% endif %}

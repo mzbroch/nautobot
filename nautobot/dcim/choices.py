@@ -991,9 +991,12 @@ class PortTypeChoices(ChoiceSet):
 class CableEndpointSideChoices(ChoiceSet):
 
     SIDE_A = "A"
-    SIDE_Z = "Z"
+    SIDE_B = "B"
 
-    CHOICES = ((SIDE_A, "A"), (SIDE_Z, "Z"))
+    CHOICES = (
+        (SIDE_A, "A"),
+        (SIDE_B, "B"),
+    )
 
 
 class CableTypeChoices(ChoiceSet):
