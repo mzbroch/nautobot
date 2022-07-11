@@ -2351,8 +2351,8 @@ class CableCreateView(generic.ObjectEditView):
             # "power-port": forms.ConnectCableToPowerPortForm,
             # "power-outlet": forms.ConnectCableToPowerOutletForm,
             "interface": forms.InterfaceCableEndpointForm,
-            # "front-port": forms.ConnectCableToFrontPortForm,
-            # "rear-port": forms.ConnectCableToRearPortForm,
+            "front-port": forms.FrontPortCableEndpointForm,
+            "rear-port": forms.RearPortCableEndpointForm,
             # "power-feed": forms.ConnectCableToPowerFeedForm,
             # "circuit-termination": forms.ConnectCableToCircuitTerminationForm,
         }[kwargs.get("termination_b_type")]
@@ -2417,11 +2417,11 @@ class CableCreateView(generic.ObjectEditView):
 
     def post(self, request, *args, **kwargs):
         """Post Method."""
-        from nautobot.dcim.choices import CableEndpointSideChoices
         cable_form = forms.CableForm(request.POST, prefix="cable")
-        termination_a_form = forms.CableEndpointForm(request.POST, prefix="termination_a")
-        # termination_z_form = forms.CableInterfaceEndpointForm(request.POST, prefix="termination_z")
+        termination_a_form = self.model_form(request.POST, prefix="termination_a")
+
         TerminationBForset = formset_factory(self.model_form, extra=0)
+
         termination_b_formset = TerminationBForset(
             request.POST,
             prefix="termination_b",
@@ -2430,11 +2430,6 @@ class CableCreateView(generic.ObjectEditView):
         try:
             if cable_form.is_valid() and termination_a_form.is_valid() and termination_b_formset.is_valid():
                 with transaction.atomic():
-                    # print(cable_form.cleaned_data)
-                    # print(termination_a_form.cleaned_data)
-                    import pdb
-                    pdb.set_trace()
-
                     cable = cable_form.save()
                     termination_a = termination_a_form.save(commit=False)
                     termination_a.cable = cable
@@ -2445,24 +2440,9 @@ class CableCreateView(generic.ObjectEditView):
                         _termination.cable = cable
                         _termination.save()
 
-                    # from nautobot.dcim.models import CableEndpoint
-                    # termination_a = termination_a_form.save()
-                    # print(termination_a)
-                    # termination_a = CableEndpoint(
-                    #     termination=termination_a_form.cleaned_data["termination"],
-                    #     side=termination_a_form.cleaned_data["side"],
-                    #     # cable=cable,
-                    # )
-                    # # termination_z = termination_z_form.save(commit=False)
-                    # for termination in [termination_a]:
-                    #     termination.cable = cable
-                    #     termination.save()
-
                 return redirect(cable.get_absolute_url())
             else:
-                print('asdasdad')
-                # import pdb
-                # pdb.set_trace()
+                pass
 
         except Exception as error:
             print(error)

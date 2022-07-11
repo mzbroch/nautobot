@@ -289,6 +289,7 @@ class CableEndpoint(BaseModel):
 
     def clean(self):
         # TODO(mzb): self-remote endpoints always to have a different side assigned.
+        # TODO(mzb): Permit only for valid connections (ie. interface to two interfaces etc.)
         pass
 
 

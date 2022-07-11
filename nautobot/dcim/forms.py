@@ -3538,7 +3538,7 @@ class ConnectCableToPowerFeedForm(BootstrapMixin, CustomFieldModelForm):
         return getattr(self.cleaned_data["termination_b_id"], "pk", None)
 
 
-class CableEndpointForm(BootstrapMixin, CustomFieldModelForm):
+class CableEndpointFormMixin(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         """Init."""
         super().__init__(*args, **kwargs)
@@ -3604,7 +3604,10 @@ class CableEndpointForm(BootstrapMixin, CustomFieldModelForm):
             "rack_id": "$termination_rack",
         },
     )
-    side = forms.ChoiceField(choices=CableEndpointSideChoices, widget=forms.HiddenInput())
+    side = forms.ChoiceField(
+        choices=CableEndpointSideChoices,
+        widget=forms.HiddenInput(),
+    )
     termination_type = forms.ModelChoiceField(
         queryset=ContentType.objects.all(),
         widget=forms.HiddenInput(),
@@ -3616,14 +3619,13 @@ class CableEndpointForm(BootstrapMixin, CustomFieldModelForm):
             "termination_region",
             "termination_site",
             "termination_device",
-            # "termination",
             "side",
             "termination_type",
             "termination_id",
         ]
 
 
-class InterfaceCableEndpointForm(CableEndpointForm):
+class InterfaceCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomFieldModelForm):
     termination = DynamicModelChoiceField(
         queryset=Interface.objects.all(),
         label="Name",
@@ -3633,6 +3635,39 @@ class InterfaceCableEndpointForm(CableEndpointForm):
             "kind": "physical",
         },
     )
+
+    class Meta(CableEndpointFormMixin.Meta):
+        fields = CableEndpointFormMixin.Meta.fields + ["termination"]
+
+
+class FrontPortCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomFieldModelForm):
+    termination = DynamicModelChoiceField(
+        queryset=FrontPort.objects.all(),
+        label="Name",
+        # disabled_indicator="cable",
+        query_params={
+            "device_id": "$termination_device",
+            "kind": "physical",
+        },
+    )
+
+    class Meta(CableEndpointFormMixin.Meta):
+        fields = CableEndpointFormMixin.Meta.fields + ["termination"]
+
+
+class RearPortCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomFieldModelForm):
+    termination = DynamicModelChoiceField(
+        queryset=RearPort.objects.all(),
+        label="Name",
+        # disabled_indicator="cable",
+        query_params={
+            "device_id": "$termination_device",
+            "kind": "physical",
+        },
+    )
+
+    class Meta(CableEndpointFormMixin.Meta):
+        fields = CableEndpointFormMixin.Meta.fields + ["termination"]
 
 
 class CableForm(BootstrapMixin, CustomFieldModelForm):
