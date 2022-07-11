@@ -46,20 +46,20 @@
 {% endblock content_left_page %}
 
 {% block content_right_page %}
-            {% for termination in a_endpoints %}
+            {% for endpoint in a_endpoints %}
             <div class="panel panel-default">
                 <div class="panel-heading">
                     <strong>Termination A</strong>
                 </div>
-                {% include 'dcim/inc/cable_termination.html' with termination=termination %}
+                {% include 'dcim/inc/cable_termination.html' with termination=endpoint.termination %}
             </div>
             {% endfor %}
-            {% for termination in z_endpoints %}
+            {% for endpoint in z_endpoints %}
             <div class="panel panel-default">
                 <div class="panel-heading">
                     <strong>Termination B</strong>
                 </div>
-                {% include 'dcim/inc/cable_termination.html' with termination=termination %}
+                {% include 'dcim/inc/cable_termination.html' with termination=endpoint.termination %}
             </div>
             {% endfor %}
 {% endblock content_right_page %}
