@@ -2297,6 +2297,15 @@ class CableListView(generic.ObjectListView):
 class CableView(generic.ObjectView):
     queryset = Cable.objects.all()
 
+    def get_extra_context(self, request, instance):
+        a_endpoints = instance.endpoints.filter(side=CableEndpointSideChoices.SIDE_A)
+        z_endpoints = instance.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z)
+
+        return {
+            "a_endpoints": a_endpoints,
+            "z_endpoints": z_endpoints,
+        }
+
 
 class PathTraceView(generic.ObjectView):
     """
@@ -2345,7 +2354,19 @@ class CableCreateView(generic.ObjectEditView):
 
     def dispatch(self, request, *args, **kwargs):
         # Set the model_form class based on the type of component being connected
-        self.model_form = {
+        self.model_a_form = {
+            # "console-port": forms.ConnectCableToConsolePortForm,
+            # "console-server-port": forms.ConnectCableToConsoleServerPortForm,
+            # "power-port": forms.ConnectCableToPowerPortForm,
+            # "power-outlet": forms.ConnectCableToPowerOutletForm,
+            "interface": forms.InterfaceCableEndpointForm,
+            "front-port": forms.FrontPortCableEndpointForm,
+            "rear-port": forms.RearPortCableEndpointForm,
+            # "power-feed": forms.ConnectCableToPowerFeedForm,
+            # "circuit-termination": forms.ConnectCableToCircuitTerminationForm,
+        }[kwargs.get("termination_a_type")._meta.verbose_name.replace(" ", "-")]
+
+        self.model_b_form = {
             # "console-port": forms.ConnectCableToConsolePortForm,
             # "console-server-port": forms.ConnectCableToConsoleServerPortForm,
             # "power-port": forms.ConnectCableToPowerPortForm,
@@ -2368,7 +2389,7 @@ class CableCreateView(generic.ObjectEditView):
         termination_b_type = ContentType.objects.get(model=termination_b_type_name.replace("-", ""))
 
         cable_form = forms.CableForm(prefix="cable")
-        termination_a_form = self.model_form(
+        termination_a_form = self.model_a_form(
             initial={
                 "termination": termination_a,
                 "side": CableEndpointSideChoices.SIDE_A,
@@ -2393,7 +2414,7 @@ class CableCreateView(generic.ObjectEditView):
         if "termination_type" not in termination_b_initial_data:
             termination_b_initial_data["termination_type"] = termination_b_type
 
-        TerminationBForset = formset_factory(self.model_form, extra=0)
+        TerminationBForset = formset_factory(self.model_b_form, extra=0)
         termination_b_formset = TerminationBForset(
             prefix="termination_b",
             initial=[termination_b_initial_data]
@@ -2418,9 +2439,9 @@ class CableCreateView(generic.ObjectEditView):
     def post(self, request, *args, **kwargs):
         """Post Method."""
         cable_form = forms.CableForm(request.POST, prefix="cable")
-        termination_a_form = self.model_form(request.POST, prefix="termination_a")
+        termination_a_form = self.model_a_form(request.POST, prefix="termination_a")
 
-        TerminationBForset = formset_factory(self.model_form, extra=0)
+        TerminationBForset = formset_factory(self.model_b_form, extra=0)
 
         termination_b_formset = TerminationBForset(
             request.POST,
@@ -2445,7 +2466,6 @@ class CableCreateView(generic.ObjectEditView):
                 pass
 
         except Exception as error:
-            print(error)
             cable_form.add_error(field=None, error=str(Exception))
 
         return render(

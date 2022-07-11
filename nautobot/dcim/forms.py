@@ -3647,7 +3647,6 @@ class FrontPortCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomF
         # disabled_indicator="cable",
         query_params={
             "device_id": "$termination_device",
-            "kind": "physical",
         },
     )
 
@@ -3662,7 +3661,6 @@ class RearPortCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomFi
         # disabled_indicator="cable",
         query_params={
             "device_id": "$termination_device",
-            "kind": "physical",
         },
     )
 
