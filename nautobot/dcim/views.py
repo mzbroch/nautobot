@@ -2344,7 +2344,6 @@ class CableCreateView(generic.ObjectEditView):
     template_name = "dcim/cable_connect.html"
 
     def dispatch(self, request, *args, **kwargs):
-
         # Set the model_form class based on the type of component being connected
         self.model_form = {
             # "console-port": forms.ConnectCableToConsolePortForm,
@@ -2359,27 +2358,6 @@ class CableCreateView(generic.ObjectEditView):
         }[kwargs.get("termination_b_type")]
 
         return super().dispatch(request, *args, **kwargs)
-
-    def alter_obj(self, obj, request, url_args, url_kwargs):
-        termination_a_type = url_kwargs.get("termination_a_type")
-        termination_a_id = url_kwargs.get("termination_a_id")
-        termination_b_type_name = url_kwargs.get("termination_b_type")
-        self.termination_b_type = ContentType.objects.get(model=termination_b_type_name.replace("-", ""))
-
-        # Initialize Cable termination attributes
-        # obj.termination_a = termination_a_type.objects.get(pk=termination_a_id)
-        # obj.termination_b_type = self.termination_b_type
-
-        # obj.endpoints.create(termination=termination_a_type.objects.get(pk=termination_a_id), side="A")
-
-        from nautobot.dcim.models.cables import CableEndpoint
-        ce1 = CableEndpoint()
-        ce1.cable = obj
-        ce1.side = "A"
-
-        print(ce1)
-
-        return obj
 
     def get(self, request, *args, **kwargs):
         termination_a_type = kwargs.get("termination_a_type")
@@ -2397,12 +2375,9 @@ class CableCreateView(generic.ObjectEditView):
             },
             prefix="termination_a",
         )
-        #
-        # obj = self.alter_obj(self.get_object(kwargs), request, args, kwargs)
-        #
+
         # Parse initial data manually to avoid setting field values as lists
-        # initial_data = {k: request.GET[k] for k in request.GET}
-        termination_b_initial_data = {}
+        termination_b_initial_data = {k: request.GET[k] for k in request.GET}
 
         # Set initial site and rack based on side A termination (if not already set)
         termination_a_site = getattr(termination_a.parent, "site", None)
@@ -2423,8 +2398,6 @@ class CableCreateView(generic.ObjectEditView):
             prefix="termination_b",
             initial=[termination_b_initial_data]
         )
-        # import pdb
-        # pdb.set_trace()
 
         return render(
             request,

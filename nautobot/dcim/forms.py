@@ -87,6 +87,7 @@ from .constants import (
 
 from .models import (
     Cable,
+    CableEndpoint,
     DeviceBay,
     DeviceBayTemplate,
     ConsolePort,
@@ -3536,33 +3537,6 @@ class ConnectCableToPowerFeedForm(BootstrapMixin, CustomFieldModelForm):
         # Return the PK rather than the object
         return getattr(self.cleaned_data["termination_b_id"], "pk", None)
 
-from nautobot.dcim.models import CableEndpoint
-class CableEndpointForm(BootstrapMixin, CustomFieldModelForm):
-    # def __init__(self, *args, **kwargs):
-    #     """Init."""
-    #     super().__init__(*args, **kwargs)
-    #
-    #     # if self.initial.get("device"):
-    #     #     self.fields["device"].disabled = True
-    #     #     self.fields.pop("template")
-    #     #     self.fields["routing_instance"].disabled = True
-
-    # termination_type = forms.ModelMultipleChoiceField(queryset=ContentType.objects.all())
-
-    class Meta:
-        model = CableEndpoint
-        fields = [
-            # "termination_type",
-            # "termination_id",
-            # "cable",
-            # "side",
-        ]
-        # widgets = {
-        #     "type": StaticSelect2,
-        #     "length_unit": StaticSelect2,
-        # }
-        # error_messages = {"length": {"max_value": "Maximum length is 32767 (any unit)"}}
-
 
 class CableInterfaceEndpointForm(BootstrapMixin, CustomFieldModelForm):
     def __init__(self, *args, **kwargs):
@@ -3578,21 +3552,9 @@ class CableInterfaceEndpointForm(BootstrapMixin, CustomFieldModelForm):
             # Hide the termination field
             self.fields["termination"].widget = forms.HiddenInput()
 
+            # Set initial id & type
             self.fields["termination_id"].initial = termination.pk
             self.fields["termination_type"].initial = ContentType.objects.get_for_model(termination)
-
-            # self.fields["termination_device"].initial = termination.device
-            # self.fields["termination_site"].initial = termination.device.site
-            # self.fields["termination_region"].initial = termination.device.site.region
-            # self.fields["termination"].initial = termination
-
-            # # # Disable all fields if initial termination
-            # for field in self.fields:
-            #     self.fields[field].disabled = True
-
-        # if self.initial.get("side"):
-        #     _side = self.initial.get("side")
-        #     self.fields["side"].initial = _side
 
         # TODO(mzb): This needs some refactor. It rewrites query params if prefix is defined on the Form.
         _prefix = f"{self.prefix}-" if self.prefix else ""
@@ -3607,26 +3569,7 @@ class CableInterfaceEndpointForm(BootstrapMixin, CustomFieldModelForm):
                                 self.fields[field].widget.add_query_param(name=qp_name, value=f"${_prefix}{_qp_val}")
                             # self.fields[field].widget.attrs['readonly'] = True
 
-        # self.fields["termination"].widget.attrs['disabled'] = 'disabled'
-        # self.fields["side"].widget.attrs['readonly']= True
-        # import pdb
-        # pdb.set_trace()
-
-    # def save(self, *args, **kwargs):
-    #     if self.instance.termination:
-    #         self.instance.termination_id = self.instance.termination.pk
-    #         self.instance.termination_type = ContentType.objects.get(model=self.instance.__class_.model)
-    #
-    #     super().__init__(*args, **kwargs)
-
     def clean(self, *args, **kwargs):
-        # super().__init__(*args, **kwargs)
-
-        # self.cleaned_data.pop('termination_region')
-        # self.cleaned_data.pop('termination_site')
-        # self.cleaned_data.pop('termination_device')
-        # self.cleaned_data.pop('termination_rack')
-        # self.cleaned_data.pop('side')
         self.cleaned_data["termination_type"] = ContentType.objects.get_for_model(
             self.cleaned_data["termination"]
         )
@@ -3675,7 +3618,7 @@ class CableInterfaceEndpointForm(BootstrapMixin, CustomFieldModelForm):
         queryset=ContentType.objects.all(),
         widget=forms.HiddenInput(),
     )
-    # termination_id = forms.UUIDField()
+
     class Meta:
         model = CableEndpoint
         fields = [
@@ -3687,7 +3630,6 @@ class CableInterfaceEndpointForm(BootstrapMixin, CustomFieldModelForm):
             "termination_type",
             "termination_id",
         ]
-        # hidden_fields = ["side"]
 
 
 class CableForm(BootstrapMixin, CustomFieldModelForm):
