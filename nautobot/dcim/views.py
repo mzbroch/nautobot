@@ -2350,7 +2350,7 @@ class CableCreateView(generic.ObjectEditView):
             # "console-server-port": forms.ConnectCableToConsoleServerPortForm,
             # "power-port": forms.ConnectCableToPowerPortForm,
             # "power-outlet": forms.ConnectCableToPowerOutletForm,
-            "interface": forms.CableInterfaceEndpointForm,
+            "interface": forms.InterfaceCableEndpointForm,
             # "front-port": forms.ConnectCableToFrontPortForm,
             # "rear-port": forms.ConnectCableToRearPortForm,
             # "power-feed": forms.ConnectCableToPowerFeedForm,
@@ -2419,7 +2419,7 @@ class CableCreateView(generic.ObjectEditView):
         """Post Method."""
         from nautobot.dcim.choices import CableEndpointSideChoices
         cable_form = forms.CableForm(request.POST, prefix="cable")
-        termination_a_form = forms.CableInterfaceEndpointForm(request.POST, prefix="termination_a")
+        termination_a_form = forms.CableEndpointForm(request.POST, prefix="termination_a")
         # termination_z_form = forms.CableInterfaceEndpointForm(request.POST, prefix="termination_z")
         TerminationBForset = formset_factory(self.model_form, extra=0)
         termination_b_formset = TerminationBForset(

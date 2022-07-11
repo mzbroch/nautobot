@@ -3538,7 +3538,7 @@ class ConnectCableToPowerFeedForm(BootstrapMixin, CustomFieldModelForm):
         return getattr(self.cleaned_data["termination_b_id"], "pk", None)
 
 
-class CableInterfaceEndpointForm(BootstrapMixin, CustomFieldModelForm):
+class CableEndpointForm(BootstrapMixin, CustomFieldModelForm):
     def __init__(self, *args, **kwargs):
         """Init."""
         super().__init__(*args, **kwargs)
@@ -3604,15 +3604,6 @@ class CableInterfaceEndpointForm(BootstrapMixin, CustomFieldModelForm):
             "rack_id": "$termination_rack",
         },
     )
-    termination = DynamicModelChoiceField(
-        queryset=Interface.objects.all(),
-        label="Name",
-        # disabled_indicator="cable",
-        query_params={
-            "device_id": "$termination_device",
-            "kind": "physical",
-        },
-    )
     side = forms.ChoiceField(choices=CableEndpointSideChoices, widget=forms.HiddenInput())
     termination_type = forms.ModelChoiceField(
         queryset=ContentType.objects.all(),
@@ -3625,11 +3616,23 @@ class CableInterfaceEndpointForm(BootstrapMixin, CustomFieldModelForm):
             "termination_region",
             "termination_site",
             "termination_device",
-            "termination",
+            # "termination",
             "side",
             "termination_type",
             "termination_id",
         ]
+
+
+class InterfaceCableEndpointForm(CableEndpointForm):
+    termination = DynamicModelChoiceField(
+        queryset=Interface.objects.all(),
+        label="Name",
+        # disabled_indicator="cable",
+        query_params={
+            "device_id": "$termination_device",
+            "kind": "physical",
+        },
+    )
 
 
 class CableForm(BootstrapMixin, CustomFieldModelForm):
