@@ -272,7 +272,7 @@ class Cable(PrimaryModel, StatusModel):
 class CableEndpoint(BaseModel):
     cable = models.ForeignKey(
         to="dcim.Cable",
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name="endpoints",
         blank=True,
         null=True,

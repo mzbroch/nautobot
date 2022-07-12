@@ -98,7 +98,7 @@ class ComponentModel(BaseModel, CustomFieldModel, RelationshipModel):
     def parent(self):
         return getattr(self, "device", None)
 
-
+from nautobot.dcim.choices import CableEndpointSideChoices
 class CableTermination(models.Model):
     """
     An abstract model inherited by all models to which a Cable can terminate (certain device components, PowerFeed, and
@@ -116,33 +116,53 @@ class CableTermination(models.Model):
         blank=True,
         null=True,
     )
-    _cable_peer_type = models.ForeignKey(
-        to=ContentType,
-        on_delete=models.SET_NULL,
-        related_name="+",
+    cable_side = models.CharField(
+        max_length=1,
         blank=True,
-        null=True,
+        choices=CableEndpointSideChoices
     )
-    _cable_peer_id = models.UUIDField(blank=True, null=True)
-    _cable_peer = GenericForeignKey(ct_field="_cable_peer_type", fk_field="_cable_peer_id")
+    # _cable_peer_type = models.ForeignKey(
+    #     to=ContentType,
+    #     on_delete=models.SET_NULL,
+    #     related_name="+",
+    #     blank=True,
+    #     null=True,
+    # )
+    # _cable_peer_id = models.UUIDField(blank=True, null=True)
+    # _cable_peer = GenericForeignKey(ct_field="_cable_peer_type", fk_field="_cable_peer_id")
 
-    # Generic relations to Cable. These ensure that an attached Cable is deleted if the terminated object is deleted.
-    _cabled_as_a = GenericRelation(
-        to="dcim.Cable",
-        content_type_field="termination_a_type",
-        object_id_field="termination_a_id",
+    cable_endpoints = GenericRelation(
+        to='dcim.CableEndpoint',
+        content_type_field='termination_type',
+        object_id_field='termination_id',
+        related_query_name='%(class)s',
     )
-    _cabled_as_b = GenericRelation(
-        to="dcim.Cable",
-        content_type_field="termination_b_type",
-        object_id_field="termination_b_id",
-    )
+
+    # @cached_property
+    @property
+    def cable_peers(self):
+        if self.cable:
+            peers = self.cable.endpoints.exclude(side=self.cable_side).prefetch_related('termination')
+            return [peer.termination for peer in peers]
+        return []
+
+    # # Generic relations to Cable. These ensure that an attached Cable is deleted if the terminated object is deleted.
+    # _cabled_as_a = GenericRelation(
+    #     to="dcim.Cable",
+    #     content_type_field="termination_a_type",
+    #     object_id_field="termination_a_id",
+    # )
+    # _cabled_as_b = GenericRelation(
+    #     to="dcim.Cable",
+    #     content_type_field="termination_b_type",
+    #     object_id_field="termination_b_id",
+    # )
 
     class Meta:
         abstract = True
 
-    def get_cable_peer(self):
-        return self._cable_peer
+    # def get_cable_peer(self):
+    #     return self._cable_peer
 
 
 class PathEndpoint(models.Model):

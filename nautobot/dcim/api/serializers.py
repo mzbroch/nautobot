@@ -127,24 +127,26 @@ from .nested_serializers import (  # noqa: F401
 
 
 class CableTerminationSerializer(serializers.ModelSerializer):
-    cable_peer_type = serializers.SerializerMethodField(read_only=True)
-    cable_peer = serializers.SerializerMethodField(read_only=True)
+    cable_peers_type = serializers.SerializerMethodField(read_only=True)
+    cable_peers = serializers.SerializerMethodField(read_only=True)
 
     @extend_schema_field(serializers.CharField(allow_null=True))
-    def get_cable_peer_type(self, obj):
-        if obj._cable_peer is not None:
-            return f"{obj._cable_peer._meta.app_label}.{obj._cable_peer._meta.model_name}"
+    def get_cable_peers_type(self, obj):
+        if obj.cable_peers:
+            return f"{obj.cable_peers[0]._meta.app_label}.{obj.cable_peers[0]._meta.model_name}"
+
         return None
 
     @extend_schema_field(serializers.DictField(allow_null=True))
-    def get_cable_peer(self, obj):
+    def get_cable_peers(self, obj):
         """
         Return the appropriate serializer for the cable termination model.
         """
-        if obj._cable_peer is not None:
-            serializer = get_serializer_for_model(obj._cable_peer, prefix="Nested")
+        if obj.cable_peers:
+            serializer = get_serializer_for_model(obj.cable_peers[0], prefix="Nested")
             context = {"request": self.context["request"]}
-            return serializer(obj._cable_peer, context=context).data
+            return serializer(obj.cable_peers, context=context, many=True).data
+
         return None
 
 
@@ -899,8 +901,8 @@ class ConsoleServerPortSerializer(
             "type",
             "description",
             "cable",
-            "cable_peer",
-            "cable_peer_type",
+            "cable_peers",
+            "cable_peers_type",
             "connected_endpoint",
             "connected_endpoint_type",
             "connected_endpoint_reachable",
@@ -933,8 +935,8 @@ class ConsolePortSerializer(
             "type",
             "description",
             "cable",
-            "cable_peer",
-            "cable_peer_type",
+            "cable_peers",
+            "cable_peers_type",
             "connected_endpoint",
             "connected_endpoint_type",
             "connected_endpoint_reachable",
@@ -971,8 +973,8 @@ class PowerOutletSerializer(
             "feed_leg",
             "description",
             "cable",
-            "cable_peer",
-            "cable_peer_type",
+            "cable_peers",
+            "cable_peers_type",
             "connected_endpoint",
             "connected_endpoint_type",
             "connected_endpoint_reachable",
@@ -1007,8 +1009,8 @@ class PowerPortSerializer(
             "allocated_draw",
             "description",
             "cable",
-            "cable_peer",
-            "cable_peer_type",
+            "cable_peers",
+            "cable_peers_type",
             "connected_endpoint",
             "connected_endpoint_type",
             "connected_endpoint_reachable",
@@ -1059,8 +1061,8 @@ class InterfaceSerializer(
             "untagged_vlan",
             "tagged_vlans",
             "cable",
-            "cable_peer",
-            "cable_peer_type",
+            "cable_peers",
+            "cable_peers_type",
             "connected_endpoint",
             "connected_endpoint_type",
             "connected_endpoint_reachable",
@@ -1105,8 +1107,8 @@ class RearPortSerializer(TaggedObjectSerializer, CableTerminationSerializer, Cus
             "positions",
             "description",
             "cable",
-            "cable_peer",
-            "cable_peer_type",
+            "cable_peers",
+            "cable_peers_type",
             "tags",
             "custom_fields",
             "computed_fields",
@@ -1146,8 +1148,8 @@ class FrontPortSerializer(TaggedObjectSerializer, CableTerminationSerializer, Cu
             "rear_port_position",
             "description",
             "cable",
-            "cable_peer",
-            "cable_peer_type",
+            "cable_peers",
+            "cable_peers_type",
             "tags",
             "custom_fields",
             "computed_fields",
@@ -1498,8 +1500,8 @@ class PowerFeedSerializer(
             "max_utilization",
             "comments",
             "cable",
-            "cable_peer",
-            "cable_peer_type",
+            "cable_peers",
+            "cable_peers_type",
             "connected_endpoint",
             "connected_endpoint_type",
             "connected_endpoint_reachable",

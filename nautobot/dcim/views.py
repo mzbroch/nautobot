@@ -2448,25 +2448,24 @@ class CableCreateView(generic.ObjectEditView):
             prefix="termination_b",
         )
 
-        try:
-            if cable_form.is_valid() and termination_a_form.is_valid() and termination_b_formset.is_valid():
-                with transaction.atomic():
-                    cable = cable_form.save()
-                    termination_a = termination_a_form.save(commit=False)
-                    termination_a.cable = cable
-                    termination_a.save()
+        if cable_form.is_valid() and termination_a_form.is_valid() and termination_b_formset.is_valid():
+            with transaction.atomic():
+                cable = cable_form.save()
+                termination_a = termination_a_form.save(commit=False)
+                termination_a.cable = cable
+                termination_a.save()
 
-                    for _termination_form in termination_b_formset:
-                        _termination = _termination_form.save(commit=False)
-                        _termination.cable = cable
-                        _termination.save()
+                for _termination_form in termination_b_formset:
+                    _termination = _termination_form.save(commit=False)
+                    _termination.cable = cable
+                    _termination.save()
 
-                return redirect(cable.get_absolute_url())
-            else:
-                pass
+            return redirect(cable.get_absolute_url())
+        else:
+            pass
 
-        except Exception as error:
-            cable_form.add_error(field=None, error=str(Exception))
+        # except Exception as error:
+        #     cable_form.add_error(field=None, error=str(error))
 
         return render(
             request,
