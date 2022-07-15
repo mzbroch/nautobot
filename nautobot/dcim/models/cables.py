@@ -51,7 +51,6 @@ class Cable(PrimaryModel, StatusModel):
     """
     A physical connection between two endpoints.
     """
-
     # termination_a_type = models.ForeignKey(
     #     to=ContentType,
     #     limit_choices_to=CABLE_TERMINATION_MODELS,
@@ -97,17 +96,21 @@ class Cable(PrimaryModel, StatusModel):
         "length_unit",
     ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, a_terminations=None, b_terminations=None, **kwargs):
         super().__init__(*args, **kwargs)
 
         # A copy of the PK to be used by __str__ in case the object is deleted
         self._pk = self.pk
 
-        if self.present_in_database:
-            # Cache the original status so we can check later if it's been changed
-            self._orig_status = self.status
-        else:
-            self._orig_status = None
+        # Cache the original status so we can check later if it's been changed
+        self._orig_status = self.status
+
+        # Assign any *new* CableTerminations for the instance. These will replace any existing
+        # terminations on save().
+        if a_terminations is not None:
+            self.a_terminations = a_terminations
+        if b_terminations is not None:
+            self.b_terminations = b_terminations
 
     def __str__(self):
         pk = self.pk or self._pk
@@ -123,9 +126,40 @@ class Cable(PrimaryModel, StatusModel):
             cls.__status_connected = Status.objects.get_for_model(Cable).get(slug="connected")
         return cls.__status_connected
 
-    # def clean(self):
-    #     super().clean()
-    #
+    def clean(self):
+        super().clean()
+
+        # Validate length and length_unit
+        if self.length is not None and not self.length_unit:
+            raise ValidationError("Must specify a unit when setting a cable length")
+        elif self.length is None:
+            self.length_unit = ''
+
+        a_terminations = [
+            CableEndpoint(cable=self, cable_end=CableEndpointSideChoices.SIDE_A, termination=t)
+            for t in getattr(self, 'a_terminations', [])
+        ]
+        b_terminations = [
+            CableEndpoint(cable=self, cable_end=CableEndpointSideChoices.SIDE_A, termination=t)
+            for t in getattr(self, 'b_terminations', [])
+        ]
+
+        # Check that all termination objects for either end are of the same type
+        for terms in (a_terminations, b_terminations):
+            if len(terms) > 1 and not all(t.termination_type == terms[0].termination_type for t in terms[1:]):
+                raise ValidationError("Cannot connect different termination types to same end of cable.")
+
+        # Check that termination types are compatible
+        if a_terminations and b_terminations:
+            a_type = a_terminations[0].termination_type.model
+            b_type = b_terminations[0].termination_type.model
+            if b_type not in COMPATIBLE_TERMINATION_TYPES.get(a_type):
+                raise ValidationError(f"Incompatible termination types: {a_type} and {b_type}")
+
+        # Run clean() on any new CableTerminations
+        for cabletermination in [*a_terminations, *b_terminations]:
+            cabletermination.clean()
+
     #     # Validate that termination A exists
     #     if not hasattr(self, "termination_a_type"):
     #         raise ValidationError("Termination A type has not been specified")
@@ -277,7 +311,7 @@ class CableEndpoint(BaseModel):
         blank=True,
         null=True,
     )
-    side = models.CharField(max_length=50, choices=CableEndpointSideChoices, blank=True)  # side a/z
+    side = models.CharField(max_length=50, choices=CableEndpointSideChoices, blank=True)
     termination_type = models.ForeignKey(
         to=ContentType,
         limit_choices_to=CABLE_TERMINATION_MODELS,
@@ -287,10 +321,46 @@ class CableEndpoint(BaseModel):
     termination_id = models.UUIDField(blank=True, null=True)
     termination = GenericForeignKey(ct_field="termination_type", fk_field="termination_id")
 
+    class Meta:
+        unique_together = (('termination_type', 'termination_id'),)
+
+    def __str__(self):
+        return f"Cable {self.cable} to {self.termination}"
+
+    def save(self, *args, **kwargs):
+
+        super().save(*args, **kwargs)
+
+        termination_model = self.termination._meta.model
+        termination_model.objects.filter(pk=self.termination_id).update(
+            cable=self.cable,
+            cable_side=self.side,
+        )
+
+    def delete(self, *args, **kwargs):
+
+        termination_model = self.termination._meta.model
+        termination_model.objects.filter(pk=self.termination_id).update(
+            cable=None,
+            cable_side=""
+        )
+
+        super().delete(*args, **kwargs)
+
     def clean(self):
-        # TODO(mzb): self-remote endpoints always to have a different side assigned.
-        # TODO(mzb): Permit only for valid connections (ie. interface to two interfaces etc.)
-        pass
+        super().clean()
+
+        # Validate interface type (if applicable)
+        if self.termination_type.model == 'interface' and self.termination.type in NONCONNECTABLE_IFACE_TYPES:
+            raise ValidationError({
+                'termination': f'Cables cannot be terminated to {self.termination.get_type_display()} interfaces'
+            })
+
+        # A CircuitTermination attached to a ProviderNetwork cannot have a Cable
+        if self.termination_type.model == 'circuittermination' and self.termination.provider_network is not None:
+            raise ValidationError({
+                'termination': "Circuit terminations attached to a provider network may not be cabled."
+            })
 
 
 @extras_features("graphql")

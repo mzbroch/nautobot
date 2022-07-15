@@ -1,10 +1,14 @@
 CABLETERMINATION = """
 {% if value %}
+    <table>
     {% for cable_peer in value %}
+    <tr><td>
         <a href="{{ cable_peer.parent.get_absolute_url }}">{{ cable_peer.parent }}</a>
         <i class="mdi mdi-chevron-right"></i>
         <a href="{{ cable_peer.get_absolute_url }}">{{ cable_peer }}</a>
+    </td></tr>
     {% endfor %}
+    </table>
 {% else %}
     &mdash;
 {% endif %}

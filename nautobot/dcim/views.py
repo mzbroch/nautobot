@@ -2414,12 +2414,14 @@ class CableCreateView(generic.ObjectEditView):
         if "termination_type" not in termination_b_initial_data:
             termination_b_initial_data["termination_type"] = termination_b_type
 
-        TerminationBForset = formset_factory(self.model_b_form, extra=0)
+        _extra = 0
+        TerminationBForset = formset_factory(self.model_b_form, extra=_extra)
         termination_b_formset = TerminationBForset(
             prefix="termination_b",
-            initial=[termination_b_initial_data]
+            initial=[termination_b_initial_data, termination_b_initial_data],
         )
-
+        # import pdb
+        # pdb.set_trace()
         return render(
             request,
             self.template_name,
@@ -2441,13 +2443,16 @@ class CableCreateView(generic.ObjectEditView):
         cable_form = forms.CableForm(request.POST, prefix="cable")
         termination_a_form = self.model_a_form(request.POST, prefix="termination_a")
 
-        TerminationBForset = formset_factory(self.model_b_form, extra=0)
+        _extra = 0
+        TerminationBForset = formset_factory(self.model_b_form, extra=_extra)
 
         termination_b_formset = TerminationBForset(
             request.POST,
             prefix="termination_b",
         )
 
+        # import pdb
+        # pdb.set_trace()
         if cable_form.is_valid() and termination_a_form.is_valid() and termination_b_formset.is_valid():
             with transaction.atomic():
                 cable = cable_form.save()

@@ -7,6 +7,7 @@ from django.db.models import Sum
 from django.urls import reverse
 from mptt.models import MPTTModel, TreeForeignKey
 from taggit.managers import TaggableManager
+from nautobot.dcim.choices import CableEndpointSideChoices
 
 from nautobot.dcim.choices import (
     ConsolePortTypeChoices,
@@ -98,7 +99,7 @@ class ComponentModel(BaseModel, CustomFieldModel, RelationshipModel):
     def parent(self):
         return getattr(self, "device", None)
 
-from nautobot.dcim.choices import CableEndpointSideChoices
+
 class CableTermination(models.Model):
     """
     An abstract model inherited by all models to which a Cable can terminate (certain device components, PowerFeed, and

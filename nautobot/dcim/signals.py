@@ -129,12 +129,12 @@ def update_connected_endpoints(instance, created, raw=False, **kwargs):
         logger.debug(f"Skipping endpoint updates for imported cable {instance}")
         return
 
-    # Cache the Cable on its two termination points
-    if instance.termination.cable != instance:
-        logger.debug(f"Updating termination {instance.side} for cable {instance}")
-        instance.termination.cable = instance.cable
-        instance.termination.cable_side = instance.side
-        instance.termination.save()
+    # # Cache the Cable on its two termination points
+    # if instance.termination.cable != instance:
+    #     logger.debug(f"Updating termination {instance.side} for cable {instance}")
+    #     instance.termination.cable = instance.cable
+    #     instance.termination.cable_side = instance.side
+    #     instance.termination.save()
 
     # if instance.termination_b.cable != instance:
     #     logger.debug(f"Updating termination B for cable {instance}")
@@ -166,12 +166,12 @@ def nullify_connected_endpoints(instance, **kwargs):
     """
     logger = logging.getLogger("nautobot.dcim.cable")
 
-    # Disassociate the Cable from its termination points
-    if instance.termination is not None:
-        logger.debug(f"Nullifying termination {instance.side} for cable {instance}")
-        instance.termination.cable = None
-        instance.termination.cable_side = None
-        instance.termination.save()
+    # # Disassociate the Cable from its termination points
+    # if instance.termination is not None:
+    #     logger.debug(f"Nullifying termination {instance.side} for cable {instance}")
+    #     instance.termination.cable = None
+    #     instance.termination.cable_side = ""
+    #     instance.termination.save()
 
     # if instance.termination_b is not None:
     #     logger.debug(f"Nullifying termination B for cable {instance}")
