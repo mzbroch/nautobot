@@ -210,7 +210,7 @@ INTERFACE_BUTTONS = """
             <span class="mdi mdi-ethernet-cable" aria-hidden="true"></span>
         </button>
         <ul class="dropdown-menu dropdown-menu-right">
-            <li><a href="{% url 'dcim:interface_connect' termination_a_id=record.pk termination_b_type='interface' %}?return_url={% url 'dcim:device_interfaces' pk=object.pk %}">Interface</a></li>
+            <li><a href="{% url 'dcim:cable_add' %}?a_terminations_type=dcim.interface&a_terminations={{ record.pk }}&b_terminations_type=dcim.interface&return_url={% url 'dcim:device_interfaces' pk=object.pk %}">Interface</a></li>
             <li><a href="{% url 'dcim:interface_connect' termination_a_id=record.pk termination_b_type='front-port' %}?return_url={% url 'dcim:device_interfaces' pk=object.pk %}">Front Port</a></li>
             <li><a href="{% url 'dcim:interface_connect' termination_a_id=record.pk termination_b_type='rear-port' %}?return_url={% url 'dcim:device_interfaces' pk=object.pk %}">Rear Port</a></li>
             <li><a href="{% url 'dcim:interface_connect' termination_a_id=record.pk termination_b_type='circuit-termination' %}?return_url={% url 'dcim:device_interfaces' pk=object.pk %}">Circuit Termination</a></li>

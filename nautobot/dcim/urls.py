@@ -1257,6 +1257,7 @@ urlpatterns = [
     ),
     # Cables
     path("cables/", views.CableListView.as_view(), name="cable_list"),
+    path('cables/add/', views.CableEditView.as_view(), name='cable_add'),
     path("cables/import/", views.CableBulkImportView.as_view(), name="cable_import"),
     path("cables/edit/", views.CableBulkEditView.as_view(), name="cable_bulk_edit"),
     path("cables/delete/", views.CableBulkDeleteView.as_view(), name="cable_bulk_delete"),

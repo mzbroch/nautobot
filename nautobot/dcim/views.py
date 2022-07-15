@@ -2487,11 +2487,61 @@ class CableCreateView(generic.ObjectEditView):
             },
         )
 
+from nautobot.circuits.models import CircuitTermination
+CABLE_TERMINATION_TYPES = {
+    'dcim.consoleport': ConsolePort,
+    'dcim.consoleserverport': ConsoleServerPort,
+    'dcim.powerport': PowerPort,
+    'dcim.poweroutlet': PowerOutlet,
+    'dcim.interface': Interface,
+    'dcim.frontport': FrontPort,
+    'dcim.rearport': RearPort,
+    'dcim.powerfeed': PowerFeed,
+    'circuits.circuittermination': CircuitTermination,
+}
+
 
 class CableEditView(generic.ObjectEditView):
     queryset = Cable.objects.all()
-    model_form = forms.CableForm
-    template_name = "dcim/cable_edit.html"
+    template_name = 'dcim/cable_edit.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        print("here1")
+        from nautobot.dcim.connections import get_cable_form
+        # If creating a new Cable, initialize the form class using URL query params
+        if 'pk' not in kwargs:
+            self.model_form = get_cable_form(
+                a_type=CABLE_TERMINATION_TYPES.get(request.GET.get('a_terminations_type')),
+                b_type=CABLE_TERMINATION_TYPES.get(request.GET.get('b_terminations_type'))
+            )
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_object(self, kwargs):
+        """
+        Hack into get_object() to set the form class when editing an existing Cable, since ObjectEditView
+        doesn't currently provide a hook for dynamic class resolution.
+        """
+        obj = super().get_object(kwargs)
+        from nautobot.dcim.connections import get_cable_form
+
+        if obj.pk:
+            # TODO: Optimize this logic
+            termination_a = obj.endpoints.filter(side=CableEndpointSideChoices.SIDE_A).first()
+            a_type = termination_a.termination._meta.model if termination_a else None
+            termination_b = obj.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z).first()
+            b_type = termination_b.termination._meta.model if termination_a else None
+            self.model_form = get_cable_form(a_type, b_type)
+
+        # import pdb
+        # pdb.set_trace()
+        return obj
+
+
+# class CableEditView(generic.ObjectEditView):
+#     queryset = Cable.objects.all()
+#     model_form = forms.CableForm
+#     template_name = "dcim/cable_edit.html"
 
 
 class CableDeleteView(generic.ObjectDeleteView):

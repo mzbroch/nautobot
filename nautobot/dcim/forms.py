@@ -3538,134 +3538,134 @@ class ConnectCableToPowerFeedForm(BootstrapMixin, CustomFieldModelForm):
         return getattr(self.cleaned_data["termination_b_id"], "pk", None)
 
 
-class CableEndpointFormMixin(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        """Init."""
-        super().__init__(*args, **kwargs)
-
-        if self.initial.get("termination"):
-            termination = self.initial.get("termination")
-
-            # Assign the termination to the instance
-            self.instance.termination = termination
-
-            # Hide the termination field
-            self.fields["termination"].widget = forms.HiddenInput()
-
-            # Set initial id & type
-            self.fields["termination_id"].initial = termination.pk
-            self.fields["termination_type"].initial = ContentType.objects.get_for_model(termination)
-
-        # TODO(mzb): This needs some refactor. It rewrites query params if prefix is defined on the Form.
-        _prefix = f"{self.prefix}-" if self.prefix else ""
-        if _prefix:
-            for field in self.fields:
-                if hasattr(self.fields[field], "query_params"):
-                    for qp_name, qp_val in self.fields[field].query_params.items():
-                        if qp_val.startswith("$") and hasattr(self.fields[field], "widget"):
-                            _qp_val = qp_val.lstrip("$")
-                            if f"data-query-param-{qp_name}" in self.fields[field].widget.attrs:
-                                self.fields[field].widget.attrs.pop(f"data-query-param-{qp_name}", None)
-                                self.fields[field].widget.add_query_param(name=qp_name, value=f"${_prefix}{_qp_val}")
-                            # self.fields[field].widget.attrs['readonly'] = True
-
-    def clean(self, *args, **kwargs):
-        self.cleaned_data["termination_type"] = ContentType.objects.get_for_model(
-            self.cleaned_data["termination"]
-        )
-        self.cleaned_data["termination_id"] = self.cleaned_data["termination"].pk
-
-        return super().clean()
-
-    termination_region = DynamicModelChoiceField(
-        queryset=Region.objects.all(),
-        label="Region",
-        required=False,
-    )
-    termination_site = DynamicModelChoiceField(
-        queryset=Site.objects.all(),
-        label="Site",
-        required=False,
-        query_params={"region_id": "$termination_region"},
-    )
-    termination_rack = DynamicModelChoiceField(
-        queryset=Rack.objects.all(),
-        label="Rack",
-        required=False,
-        null_option="None",
-        query_params={"site_id": "$termination_site"},
-    )
-    termination_device = DynamicModelChoiceField(
-        queryset=Device.objects.all(),
-        label="Device",
-        required=False,
-        query_params={
-            "site_id": "$termination_site",
-            "rack_id": "$termination_rack",
-        },
-    )
-    side = forms.ChoiceField(
-        choices=CableEndpointSideChoices,
-        widget=forms.HiddenInput(),
-    )
-    termination_type = forms.ModelChoiceField(
-        queryset=ContentType.objects.all(),
-        widget=forms.HiddenInput(),
-    )
-
-    class Meta:
-        model = CableEndpoint
-        fields = [
-            "termination_region",
-            "termination_site",
-            "termination_device",
-            "side",
-            "termination_type",
-            "termination_id",
-        ]
-
-
-class InterfaceCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomFieldModelForm):
-    termination = DynamicModelChoiceField(
-        queryset=Interface.objects.all(),
-        label="Name",
-        # disabled_indicator="cable",
-        query_params={
-            "device_id": "$termination_device",
-            "kind": "physical",
-        },
-    )
-
-    class Meta(CableEndpointFormMixin.Meta):
-        fields = CableEndpointFormMixin.Meta.fields + ["termination"]
+# class CableEndpointFormMixin(forms.ModelForm):
+#     def __init__(self, *args, **kwargs):
+#         """Init."""
+#         super().__init__(*args, **kwargs)
+#
+#         if self.initial.get("termination"):
+#             termination = self.initial.get("termination")
+#
+#             # Assign the termination to the instance
+#             self.instance.termination = termination
+#
+#             # Hide the termination field
+#             self.fields["termination"].widget = forms.HiddenInput()
+#
+#             # Set initial id & type
+#             self.fields["termination_id"].initial = termination.pk
+#             self.fields["termination_type"].initial = ContentType.objects.get_for_model(termination)
+#
+#         # TODO(mzb): This needs some refactor. It rewrites query params if prefix is defined on the Form.
+#         _prefix = f"{self.prefix}-" if self.prefix else ""
+#         if _prefix:
+#             for field in self.fields:
+#                 if hasattr(self.fields[field], "query_params"):
+#                     for qp_name, qp_val in self.fields[field].query_params.items():
+#                         if qp_val.startswith("$") and hasattr(self.fields[field], "widget"):
+#                             _qp_val = qp_val.lstrip("$")
+#                             if f"data-query-param-{qp_name}" in self.fields[field].widget.attrs:
+#                                 self.fields[field].widget.attrs.pop(f"data-query-param-{qp_name}", None)
+#                                 self.fields[field].widget.add_query_param(name=qp_name, value=f"${_prefix}{_qp_val}")
+#                             # self.fields[field].widget.attrs['readonly'] = True
+#
+#     def clean(self, *args, **kwargs):
+#         self.cleaned_data["termination_type"] = ContentType.objects.get_for_model(
+#             self.cleaned_data["termination"]
+#         )
+#         self.cleaned_data["termination_id"] = self.cleaned_data["termination"].pk
+#
+#         return super().clean()
+#
+#     termination_region = DynamicModelChoiceField(
+#         queryset=Region.objects.all(),
+#         label="Region",
+#         required=False,
+#     )
+#     termination_site = DynamicModelChoiceField(
+#         queryset=Site.objects.all(),
+#         label="Site",
+#         required=False,
+#         query_params={"region_id": "$termination_region"},
+#     )
+#     termination_rack = DynamicModelChoiceField(
+#         queryset=Rack.objects.all(),
+#         label="Rack",
+#         required=False,
+#         null_option="None",
+#         query_params={"site_id": "$termination_site"},
+#     )
+#     termination_device = DynamicModelChoiceField(
+#         queryset=Device.objects.all(),
+#         label="Device",
+#         required=False,
+#         query_params={
+#             "site_id": "$termination_site",
+#             "rack_id": "$termination_rack",
+#         },
+#     )
+#     side = forms.ChoiceField(
+#         choices=CableEndpointSideChoices,
+#         widget=forms.HiddenInput(),
+#     )
+#     termination_type = forms.ModelChoiceField(
+#         queryset=ContentType.objects.all(),
+#         widget=forms.HiddenInput(),
+#     )
+#
+#     class Meta:
+#         model = CableEndpoint
+#         fields = [
+#             "termination_region",
+#             "termination_site",
+#             "termination_device",
+#             "side",
+#             "termination_type",
+#             "termination_id",
+#         ]
 
 
-class FrontPortCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomFieldModelForm):
-    termination = DynamicModelChoiceField(
-        queryset=FrontPort.objects.all(),
-        label="Name",
-        # disabled_indicator="cable",
-        query_params={
-            "device_id": "$termination_device",
-        },
-    )
-
-    class Meta(CableEndpointFormMixin.Meta):
-        fields = CableEndpointFormMixin.Meta.fields + ["termination"]
-
-
-class RearPortCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomFieldModelForm):
-    termination = DynamicModelChoiceField(
-        queryset=RearPort.objects.all(),
-        label="Name",
-        # disabled_indicator="cable",
-        query_params={
-            "device_id": "$termination_device",
-        },
-    )
-
-    class Meta(CableEndpointFormMixin.Meta):
-        fields = CableEndpointFormMixin.Meta.fields + ["termination"]
+# class InterfaceCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomFieldModelForm):
+#     termination = DynamicModelChoiceField(
+#         queryset=Interface.objects.all(),
+#         label="Name",
+#         # disabled_indicator="cable",
+#         query_params={
+#             "device_id": "$termination_device",
+#             "kind": "physical",
+#         },
+#     )
+#
+#     class Meta(CableEndpointFormMixin.Meta):
+#         fields = CableEndpointFormMixin.Meta.fields + ["termination"]
+#
+#
+# class FrontPortCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomFieldModelForm):
+#     termination = DynamicModelChoiceField(
+#         queryset=FrontPort.objects.all(),
+#         label="Name",
+#         # disabled_indicator="cable",
+#         query_params={
+#             "device_id": "$termination_device",
+#         },
+#     )
+#
+#     class Meta(CableEndpointFormMixin.Meta):
+#         fields = CableEndpointFormMixin.Meta.fields + ["termination"]
+#
+#
+# class RearPortCableEndpointForm(CableEndpointFormMixin, BootstrapMixin, CustomFieldModelForm):
+#     termination = DynamicModelChoiceField(
+#         queryset=RearPort.objects.all(),
+#         label="Name",
+#         # disabled_indicator="cable",
+#         query_params={
+#             "device_id": "$termination_device",
+#         },
+#     )
+#
+#     class Meta(CableEndpointFormMixin.Meta):
+#         fields = CableEndpointFormMixin.Meta.fields + ["termination"]
 
 
 class CableForm(BootstrapMixin, CustomFieldModelForm):
