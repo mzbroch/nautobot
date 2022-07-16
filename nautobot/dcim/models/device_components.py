@@ -57,6 +57,7 @@ __all__ = (
     "RearPort",
 )
 
+from functools import cached_property
 
 class ComponentModel(BaseModel, CustomFieldModel, RelationshipModel):
     """
@@ -140,7 +141,7 @@ class CableTermination(models.Model):
     )
 
     # @cached_property
-    @property
+    @cached_property
     def cable_peers(self):
         if self.cable:
             peers = self.cable.endpoints.exclude(side=self.cable_side).prefetch_related('termination')

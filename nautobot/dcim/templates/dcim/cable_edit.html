@@ -60,24 +60,24 @@
                         <strong>B Side</strong>
                     </div>
                     <div class="panel-body">
-                        {% render_field form.termination_a_region %}
-                        {% render_field form.termination_a_site %}
-                      {% if 'termination_a_rack' in form.fields %}
-                          {% render_field form.termination_a_rack %}
+                        {% render_field form.termination_b_region %}
+                        {% render_field form.termination_b_site %}
+                      {% if 'termination_b_rack' in form.fields %}
+                          {% render_field form.termination_b_rack %}
                       {% endif %}
-                      {% if 'termination_a_device' in form.fields %}
-                          {% render_field form.termination_a_device %}
+                      {% if 'termination_b_device' in form.fields %}
+                          {% render_field form.termination_b_device %}
                       {% endif %}
-                      {% if 'termination_a_powerpanel' in form.fields %}
-                          {% render_field form.termination_a_powerpanel %}
+                      {% if 'termination_b_powerpanel' in form.fields %}
+                          {% render_field form.termination_b_powerpanel %}
                       {% endif %}
-                      {% if 'termination_a_provider' in form.fields %}
-                          {% render_field form.termination_a_provider %}
+                      {% if 'termination_b_provider' in form.fields %}
+                          {% render_field form.termination_b_provider %}
                       {% endif %}
-                      {% if 'termination_a_circuit' in form.fields %}
-                          {% render_field form.termination_a_circuit %}
+                      {% if 'termination_b_circuit' in form.fields %}
+                          {% render_field form.termination_b_circuit %}
                       {% endif %}
-                      {% render_field form.a_terminations %}
+                      {% render_field form.b_terminations %}
                     </div>
                 </div>
             </div>
