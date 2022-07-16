@@ -96,6 +96,20 @@ class Cable(PrimaryModel, StatusModel):
         "length_unit",
     ]
 
+    @property
+    def termination_a_type(self):
+        termination_a = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_A).first()
+        a_type = termination_a.termination._meta.model if termination_a else None
+
+        return a_type
+
+    @property
+    def termination_b_type(self):
+        termination_b = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z).first()
+        b_type = termination_b.termination._meta.model if termination_b else None
+
+        return b_type
+
     def get_a_terminations(self):
         # Query self.endpoints.all() to leverage cached results
         return [

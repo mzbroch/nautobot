@@ -69,6 +69,7 @@ from .models import (
     Site,
     VirtualChassis,
 )
+from nautobot.dcim.connections import get_cable_form
 
 
 class BulkDisconnectView(GetReturnURLMixin, ObjectPermissionRequiredMixin, View):
@@ -2505,8 +2506,12 @@ class CableEditView(generic.ObjectEditView):
     queryset = Cable.objects.all()
     template_name = 'dcim/cable_edit.html'
 
+    # def get(self, *args, **kwargs):
+    #     super().get(*args, **kwargs)
+    #     import pdb
+    #     pdb.set_trace()
+
     def dispatch(self, request, *args, **kwargs):
-        print("here1")
         from nautobot.dcim.connections import get_cable_form
         # If creating a new Cable, initialize the form class using URL query params
         if 'pk' not in kwargs:
@@ -2523,18 +2528,13 @@ class CableEditView(generic.ObjectEditView):
         doesn't currently provide a hook for dynamic class resolution.
         """
         obj = super().get_object(kwargs)
-        from nautobot.dcim.connections import get_cable_form
 
-        if obj.pk:
-            # TODO: Optimize this logic
-            termination_a = obj.endpoints.filter(side=CableEndpointSideChoices.SIDE_A).first()
-            a_type = termination_a.termination._meta.model if termination_a else None
-            termination_b = obj.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z).first()
-            b_type = termination_b.termination._meta.model if termination_a else None
-            self.model_form = get_cable_form(a_type, b_type)
+        if obj.present_in_database:
+            self.model_form = get_cable_form(
+                a_type=obj.termination_a_type,
+                b_type=obj.termination_b_type,
+            )
 
-        # import pdb
-        # pdb.set_trace()
         return obj
 
 

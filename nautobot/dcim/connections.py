@@ -13,7 +13,6 @@ def get_cable_form(a_type, b_type):
         def __new__(mcs, name, bases, attrs):
 
             for cable_end, term_cls in (('a', a_type), ('b', b_type)):
-
                 attrs[f'termination_{cable_end}_region'] = DynamicModelChoiceField(
                     queryset=Region.objects.all(),
                     label='Region',
@@ -36,7 +35,6 @@ def get_cable_form(a_type, b_type):
                     required=False,
                     query_params={
                         'region_id': f'$termination_{cable_end}_region',
-                        'group_id': f'$termination_{cable_end}_sitegroup',
                     }
                 )
                 # attrs[f'termination_{cable_end}_location'] = DynamicModelChoiceField(
@@ -51,7 +49,6 @@ def get_cable_form(a_type, b_type):
 
                 # Device component
                 if hasattr(term_cls, 'device'):
-
                     attrs[f'termination_{cable_end}_rack'] = DynamicModelChoiceField(
                         queryset=Rack.objects.all(),
                         label='Rack',
@@ -62,7 +59,6 @@ def get_cable_form(a_type, b_type):
                         },
                         query_params={
                             'site_id': f'$termination_{cable_end}_site',
-                            'location_id': f'$termination_{cable_end}_location',
                         }
                     )
                     attrs[f'termination_{cable_end}_device'] = DynamicModelChoiceField(
@@ -74,7 +70,6 @@ def get_cable_form(a_type, b_type):
                         },
                         query_params={
                             'site_id': f'$termination_{cable_end}_site',
-                            'location_id': f'$termination_{cable_end}_location',
                             'rack_id': f'$termination_{cable_end}_rack',
                         }
                     )

@@ -21,7 +21,7 @@
             </div>
         </div>
     {% endif %}
-    {% with termination_a=termination_a_form.instance.termination %}
+    {% with termination_a=form.instance.termination_a %}
         <h3>{% block title %}Connect {{ termination_a.device }} {{ termination_a }} to {{ termination_b_type|bettertitle }}{% endblock %}</h3>
         <div class="row">
             <div class="col-md-5">
@@ -30,86 +30,30 @@
                         <strong>A Side</strong>
                     </div>
                     <div class="panel-body">
-                        {% if termination_a.device %}
-                            {# Device component #}
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Region</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a.device.site.region }}</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Site</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a.device.site }}</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Rack</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a.device.rack|default:"None" }}</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Device</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a.device }}</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Type</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a|meta:"verbose_name"|capfirst }}</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Name</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a.name }}</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Side</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">A</p>
-                                </div>
-                            </div>
-                        {% else %}
-                            {# Circuit termination #}
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Site</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a.site }}</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Provider</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a.circuit.provider }}</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Circuit</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a.circuit.cid }}</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="col-md-3 control-label required">Side</label>
-                                <div class="col-md-9">
-                                    <p class="form-control-static">{{ termination_a.term_side }}</p>
-                                </div>
-                            </div>
-                        {% endif %}
+                        {% render_field form.termination_a_region %}
+                        {% render_field form.termination_a_site %}
+                      {% if 'termination_a_rack' in form.fields %}
+                          {% render_field form.termination_a_rack %}
+                      {% endif %}
+                      {% if 'termination_a_device' in form.fields %}
+                          {% render_field form.termination_a_device %}
+                      {% endif %}
+                      {% if 'termination_a_powerpanel' in form.fields %}
+                          {% render_field form.termination_a_powerpanel %}
+                      {% endif %}
+                      {% if 'termination_a_provider' in form.fields %}
+                          {% render_field form.termination_a_provider %}
+                      {% endif %}
+                      {% if 'termination_a_circuit' in form.fields %}
+                          {% render_field form.termination_a_circuit %}
+                      {% endif %}
+                      {% render_field form.a_terminations %}
                     </div>
                 </div>
             </div>
             <div class="col-md-2 text-center" style="padding-top: 90px;">
                 <i class="mdi mdi-swap-horizontal-bold mdi-48px"></i>
             </div>
-            <!-- mzb -->
-            {{ termination_b_formset.management_form }}
-            {% for termination_z_form in termination_b_formset %}
             <div class="col-md-5">
                 <div class="panel panel-default">
                     <div class="panel-heading text-center">
@@ -123,39 +67,47 @@
                                 {% endfor %}
                             </ul>
                         {% endif %}
-                        {% if 'termination_provider' in termination_z_form.fields %}
-                            {% render_field termination_z_form.termination_provider %}
+                        {% if 'termination_b_provider' in form.fields %}
+                            {% render_field form.termination_b_provider %}
                         {% endif %}
-                        {% if 'termination_region' in termination_z_form.fields %}
-                            {% render_field termination_z_form.termination_region %}
+                        {% if 'termination_b_region' in form.fields %}
+                            {% render_field form.termination_b_region %}
                         {% endif %}
-                        {% if 'termination_site' in termination_z_form.fields %}
-                            {% render_field termination_z_form.termination_site %}
+                        {% if 'termination_b_site' in form.fields %}
+                            {% render_field form.termination_b_site %}
                         {% endif %}
-                        {% if 'termination_rackgroup' in termination_z_form.fields %}
-                            {% render_field termination_z_form.termination_rackgroup %}
+                        {% if 'termination_b_rackgroup' in form.fields %}
+                            {% render_field form.termination_b_rackgroup %}
                         {% endif %}
-                        {% if 'termination_rack' in termination_z_form.fields %}
-                            {% render_field termination_z_form.termination_rack %}
+                        {% if 'termination_b_rack' in form.fields %}
+                            {% render_field form.termination_b_rack %}
                         {% endif %}
-                        {% if 'termination_device' in termination_z_form.fields %}
-                            {% render_field termination_z_form.termination_device %}
+                        {% if 'termination_b_device' in form.fields %}
+                            {% render_field form.termination_b_device %}
                         {% endif %}
-                        {% if 'termination_powerpanel' in termination_z_form.fields %}
-                            {% render_field termination_z_form.termination_powerpanel %}
+                        {% if 'termination_b_type' in form.fields %}
+                            {% render_field form.termination_b_type %}
                         {% endif %}
-                        {% if 'termination_circuit' in termination_z_form.fields %}
-                            {% render_field termination_z_form.termination_circuit %}
+                        {% if 'termination_b_powerpanel' in form.fields %}
+                            {% render_field form.termination_b_powerpanel %}
                         {% endif %}
-                        {% render_field termination_z_form.termination %}
+                        {% if 'termination_b_circuit' in form.fields %}
+                            {% render_field form.termination_b_circuit %}
+                        {% endif %}
+                        <div class="form-group">
+                            <label class="col-md-3 control-label required">Type</label>
+                            <div class="col-md-9">
+                                <p class="form-control-static">{{ termination_b_type|capfirst }}</p>
+                            </div>
+                        </div>
+                        {% render_field form.termination_b_id %}
                     </div>
                 </div>
             </div>
-            {% endfor %}
         </div>
         <div class="row">
             <div class="col-md-6 col-md-offset-3">
-                {% include 'dcim/inc/cable_form.html' with form=cable_form%}
+                {% include 'dcim/inc/cable_form.html' %}
             </div>
         </div>
         <div class="form-group">
