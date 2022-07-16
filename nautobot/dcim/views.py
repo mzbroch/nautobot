@@ -2506,13 +2506,7 @@ class CableEditView(generic.ObjectEditView):
     queryset = Cable.objects.all()
     template_name = 'dcim/cable_edit.html'
 
-    # def get(self, *args, **kwargs):
-    #     super().get(*args, **kwargs)
-    #     import pdb
-    #     pdb.set_trace()
-
     def dispatch(self, request, *args, **kwargs):
-        from nautobot.dcim.connections import get_cable_form
         # If creating a new Cable, initialize the form class using URL query params
         if 'pk' not in kwargs:
             self.model_form = get_cable_form(
