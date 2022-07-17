@@ -24,6 +24,7 @@ from nautobot.utilities.fields import ColorField
 from nautobot.utilities.utils import to_meters
 from .devices import Device
 from .device_components import FrontPort, RearPort
+from nautobot.utilities.querysets import RestrictedQuerySet
 
 
 __all__ = (
@@ -51,22 +52,6 @@ class Cable(PrimaryModel, StatusModel):
     """
     A physical connection between two endpoints.
     """
-    # termination_a_type = models.ForeignKey(
-    #     to=ContentType,
-    #     limit_choices_to=CABLE_TERMINATION_MODELS,
-    #     on_delete=models.PROTECT,
-    #     related_name="+",
-    # )
-    # termination_a_id = models.UUIDField()
-    # termination_a = GenericForeignKey(ct_field="termination_a_type", fk_field="termination_a_id")
-    # termination_b_type = models.ForeignKey(
-    #     to=ContentType,
-    #     limit_choices_to=CABLE_TERMINATION_MODELS,
-    #     on_delete=models.PROTECT,
-    #     related_name="+",
-    # )
-    # termination_b_id = models.UUIDField()
-    # termination_b = GenericForeignKey(ct_field="termination_b_type", fk_field="termination_b_id")
     type = models.CharField(max_length=50, choices=CableTypeChoices, blank=True)
     label = models.CharField(max_length=100, blank=True)
     color = ColorField(blank=True)
@@ -78,14 +63,6 @@ class Cable(PrimaryModel, StatusModel):
     )
     # Stores the normalized length (in meters) for database ordering
     _abs_length = models.DecimalField(max_digits=10, decimal_places=4, blank=True, null=True)
-    # # Cache the associated device (where applicable) for the A and B terminations. This enables filtering of Cables by
-    # # their associated Devices.
-    # _termination_a_device = models.ForeignKey(
-    #     to=Device, on_delete=models.CASCADE, related_name="+", blank=True, null=True
-    # )
-    # _termination_b_device = models.ForeignKey(
-    #     to=Device, on_delete=models.CASCADE, related_name="+", blank=True, null=True
-    # )
 
     csv_headers = [
         "type",
@@ -110,17 +87,33 @@ class Cable(PrimaryModel, StatusModel):
 
         return b_type
 
-    def get_a_terminations(self):
-        # Query self.endpoints.all() to leverage cached results
+    @property
+    def a_terminations(self):
+        if hasattr(self, '_a_terminations'):
+            return self._a_terminations
+        # Query self.terminations.all() to leverage cached results
         return [
-            ct.termination for ct in self.endpoints.all() if ct.cable_end == CableEndpointSideChoices.SIDE_A
+            endpoint.termination for endpoint in self.endpoints.all() if endpoint.side == CableEndpointSideChoices.SIDE_A
         ]
 
-    def get_b_terminations(self):
-        # Query self.endpoints.all() to leverage cached results
+    @a_terminations.setter
+    def a_terminations(self, value):
+        self._terminations_modified = True
+        self._a_terminations = value
+
+    @property
+    def b_terminations(self):
+        if hasattr(self, '_b_terminations'):
+            return self._b_terminations
+        # Query self.terminations.all() to leverage cached results
         return [
-            ct.termination for ct in self.endpoints.all() if ct.cable_end == CableEndpointSideChoices.SIDE_B
+            endpoint.termination for endpoint in self.endpoints.all() if endpoint.side == CableEndpointSideChoices.SIDE_Z
         ]
+
+    @b_terminations.setter
+    def b_terminations(self, value):
+        self._terminations_modified = True
+        self._b_terminations = value
 
     def __init__(self, *args, a_terminations=None, b_terminations=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -131,11 +124,12 @@ class Cable(PrimaryModel, StatusModel):
         # Cache the original status so we can check later if it's been changed
         self._orig_status = self.status
 
-        # Assign any *new* CableTerminations for the instance. These will replace any existing
-        # terminations on save().
-        if a_terminations is not None:
+        self._terminations_modified = False
+
+        # Assign or retrieve A/B terminations
+        if a_terminations:
             self.a_terminations = a_terminations
-        if b_terminations is not None:
+        if b_terminations:
             self.b_terminations = b_terminations
 
     def __str__(self):
@@ -161,30 +155,37 @@ class Cable(PrimaryModel, StatusModel):
         elif self.length is None:
             self.length_unit = ''
 
-        a_terminations = [
-            CableEndpoint(cable=self, cable_end=CableEndpointSideChoices.SIDE_A, termination=t)
-            for t in getattr(self, 'a_terminations', [])
-        ]
-        b_terminations = [
-            CableEndpoint(cable=self, cable_end=CableEndpointSideChoices.SIDE_A, termination=t)
-            for t in getattr(self, 'b_terminations', [])
-        ]
+        if (not self.present_in_database) and (not self.a_terminations or not self.b_terminations):
+            raise ValidationError("Must define A and B terminations when creating a new cable.")
 
-        # Check that all termination objects for either end are of the same type
-        for terms in (a_terminations, b_terminations):
-            if len(terms) > 1 and not all(t.termination_type == terms[0].termination_type for t in terms[1:]):
-                raise ValidationError("Cannot connect different termination types to same end of cable.")
+        if self._terminations_modified:
 
-        # Check that termination types are compatible
-        if a_terminations and b_terminations:
-            a_type = a_terminations[0].termination_type.model
-            b_type = b_terminations[0].termination_type.model
-            if b_type not in COMPATIBLE_TERMINATION_TYPES.get(a_type):
-                raise ValidationError(f"Incompatible termination types: {a_type} and {b_type}")
+            # Check that all termination objects for either end are of the same type
+            for terms in (self.a_terminations, self.b_terminations):
+                if len(terms) > 1 and not all(isinstance(t, type(terms[0])) for t in terms[1:]):
+                    raise ValidationError("Cannot connect different termination types to same end of cable.")
 
-        # Run clean() on any new CableTerminations
-        for cabletermination in [*a_terminations, *b_terminations]:
-            cabletermination.clean()
+            # Check that termination types are compatible
+            if self.a_terminations and self.b_terminations:
+                a_type = self.a_terminations[0]._meta.model_name
+                b_type = self.b_terminations[0]._meta.model_name
+                if b_type not in COMPATIBLE_TERMINATION_TYPES.get(a_type):
+                    raise ValidationError(f"Incompatible termination types: {a_type} and {b_type}")
+
+            # Run clean() on any new CableTerminations
+            for termination in self.a_terminations:
+                CableEndpoint(
+                    cable=self,
+                    cable_end=CableEndpointSideChoices.SIDE_A,
+                    termination=termination
+                ).clean()
+
+            for termination in self.b_terminations:
+                CableEndpoint(
+                    cable=self,
+                    cable_end=CableEndpointSideChoices.SIDE_Z,
+                    termination=termination
+                ).clean()
 
     def save(self, *args, **kwargs):
 
@@ -200,28 +201,28 @@ class Cable(PrimaryModel, StatusModel):
         self._pk = self.pk
 
         # Retrieve existing A/B terminations for the Cable
-        a_terminations = {ct.termination: ct for ct in self.endpoints.filter(side=CableEndpointSideChoices.SIDE_A)}
+        a_terminations = {ct.termination: ct for ct in self.endpoints.filter(side=CableEndpointSideChoices.SIDE_A)}  # TODO(mzb) rename to endpoints
         b_terminations = {ct.termination: ct for ct in self.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z)}
 
         # Delete stale CableTerminations
-        if hasattr(self, 'a_terminations'):
+        if self._terminations_modified:
             for termination, ct in a_terminations.items():
-                if termination not in self.a_terminations:
+                if termination.pk and termination not in self.a_terminations:
                     ct.delete()
-        if hasattr(self, 'b_terminations'):
             for termination, ct in b_terminations.items():
-                if termination not in self.b_terminations:
+                if termination.pk and termination not in self.b_terminations:
                     ct.delete()
 
         # Save new CableTerminations (if any)
-        if hasattr(self, 'a_terminations'):
+        if self._terminations_modified:
             for termination in self.a_terminations:
-                if termination not in a_terminations:
+                if not termination.present_in_database or termination not in a_terminations:
                     CableEndpoint(cable=self, side=CableEndpointSideChoices.SIDE_A, termination=termination).save()
-        if hasattr(self, 'b_terminations'):
             for termination in self.b_terminations:
-                if termination not in b_terminations:
+                if not termination.present_in_database or termination not in b_terminations:
                     CableEndpoint(cable=self, side=CableEndpointSideChoices.SIDE_Z, termination=termination).save()
+
+        # trace_paths.send(Cable, instance=self, created=_created)  # TODO(mzb)
 
     def to_csv(self):
         return (
@@ -247,50 +248,43 @@ class Cable(PrimaryModel, StatusModel):
 
 
 class CableEndpoint(BaseModel):
+    """
+    Cable Ends.
+    """
     cable = models.ForeignKey(
         to="dcim.Cable",
         on_delete=models.CASCADE,
         related_name="endpoints",
-        blank=True,
-        null=True,
+        # blank=True, # TODO(mzb)
+        # null=True, # TODO(mzb)
     )
-    side = models.CharField(max_length=50, choices=CableEndpointSideChoices, blank=True)
+    side = models.CharField(
+        max_length=1,
+        choices=CableEndpointSideChoices,
+        # blank=True
+    )
     termination_type = models.ForeignKey(
         to=ContentType,
         limit_choices_to=CABLE_TERMINATION_MODELS,
         on_delete=models.PROTECT,
-        related_name="+", blank=True, null=True,
+        related_name="+",
+        # blank=True, # TODO(mzb)
+        # null=True,  # TODO(mzb)
     )
-    termination_id = models.UUIDField(blank=True, null=True)
+    termination_id = models.UUIDField(
+        # blank=True,
+        # null=True,
+    )
     termination = GenericForeignKey(ct_field="termination_type", fk_field="termination_id")
 
+    objects = RestrictedQuerySet.as_manager()
+
     class Meta:
-        unique_together = (('termination_type', 'termination_id'),)
+        ordering = ('cable', 'side')
+        unique_together = (('termination_type', 'termination_id'),)  # TODO(mzb) ensure
 
     def __str__(self):
         return f"Cable {self.cable} to {self.termination}"
-
-    def save(self, *args, **kwargs):
-        # # Cache objects associated with the terminating object (for filtering)
-        # self.cache_related_objects()
-
-        super().save(*args, **kwargs)
-
-        termination_model = self.termination._meta.model
-        termination_model.objects.filter(pk=self.termination_id).update(
-            cable=self.cable,
-            cable_side=self.side,
-        )
-
-    def delete(self, *args, **kwargs):
-
-        termination_model = self.termination._meta.model
-        termination_model.objects.filter(pk=self.termination_id).update(
-            cable=None,
-            cable_side=""
-        )
-
-        super().delete(*args, **kwargs)
 
     def clean(self):
         super().clean()
@@ -306,6 +300,29 @@ class CableEndpoint(BaseModel):
             raise ValidationError({
                 'termination': "Circuit terminations attached to a provider network may not be cabled."
             })
+
+    def save(self, *args, **kwargs):
+
+        # # Cache objects associated with the terminating object (for filtering)
+        # self.cache_related_objects()
+
+        super().save(*args, **kwargs)
+
+        termination_model = self.termination._meta.model
+        termination_model.objects.filter(pk=self.termination_id).update(  # TODO(mzb): Caching implications of .update
+            cable=self.cable,
+            cable_side=self.side,
+        )
+
+    def delete(self, *args, **kwargs):
+
+        termination_model = self.termination._meta.model
+        termination_model.objects.filter(pk=self.termination_id).update(  # TODO(mzb): Caching implications of .update
+            cable=None,
+            cable_side=""
+        )
+
+        super().delete(*args, **kwargs)
 
 
 @extras_features("graphql")

@@ -140,8 +140,6 @@ class CableTermination(models.Model):
         related_query_name='%(class)s',
     )
 
-    # @cached_property
-    @cached_property
     def cable_peers(self):
         if self.cable:
             peers = self.cable.endpoints.exclude(side=self.cable_side).prefetch_related('termination')
