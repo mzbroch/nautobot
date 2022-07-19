@@ -674,7 +674,7 @@ class CableViewSet(StatusViewSetMixin, ModelViewSet):
 
 
 class CableEndpointViewSet(StatusViewSetMixin, ModelViewSet):
-    queryset = Cable.objects.prefetch_related('cable', 'termination')
+    queryset = CableEndpoint.objects.prefetch_related('cable', 'termination')
     serializer_class = serializers.CableEndpointSerializer
     filterset_class = filters.CableEndpointFilterSet
 
