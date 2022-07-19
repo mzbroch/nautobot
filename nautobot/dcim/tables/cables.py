@@ -19,7 +19,7 @@ __all__ = ("CableTable",)
 #
 
 
-class CableTable(StatusTableMixin, BaseTable):
+class CableTable(StatusTableMixin, BaseTable):  # TODO(mzb)
     pk = ToggleColumn()
     id = tables.Column(linkify=True, verbose_name="ID")
     termination_a_parent = tables.TemplateColumn(

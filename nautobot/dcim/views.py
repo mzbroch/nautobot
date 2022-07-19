@@ -2299,8 +2299,8 @@ class CableView(generic.ObjectView):
     queryset = Cable.objects.all()
 
     def get_extra_context(self, request, instance):
-        a_endpoints = instance.endpoints.filter(side=CableEndpointSideChoices.SIDE_A)
-        z_endpoints = instance.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z)
+        a_endpoints = instance.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_A)
+        z_endpoints = instance.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_Z)
 
         return {
             "a_endpoints": a_endpoints,
@@ -2508,6 +2508,7 @@ class CableEditView(generic.ObjectEditView):
 
     def dispatch(self, request, *args, **kwargs):
         # If creating a new Cable, initialize the form class using URL query params
+
         if 'pk' not in kwargs:
             self.model_form = get_cable_form(
                 a_type=CABLE_TERMINATION_TYPES.get(request.GET.get('a_terminations_type')),

@@ -278,7 +278,7 @@ class CableTerminationTable(BaseTable):
     )
 
 
-class PathEndpointTable(CableTerminationTable):
+class PathEndpointTable(CableTerminationTable):  # TODO(mzb)
     connection = tables.TemplateColumn(
         accessor="_path",
         template_code=PATHENDPOINT,

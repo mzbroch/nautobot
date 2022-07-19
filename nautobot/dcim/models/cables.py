@@ -75,14 +75,14 @@ class Cable(PrimaryModel, StatusModel):
 
     @property
     def termination_a_type(self):
-        termination_a = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_A).first()
+        termination_a = self.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_A).first()
         a_type = termination_a.termination._meta.model if termination_a else None
 
         return a_type
 
     @property
     def termination_b_type(self):
-        termination_b = self.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z).first()
+        termination_b = self.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_Z).first()
         b_type = termination_b.termination._meta.model if termination_b else None
 
         return b_type
@@ -147,6 +147,7 @@ class Cable(PrimaryModel, StatusModel):
         return cls.__status_connected
 
     def clean(self):
+
         super().clean()
 
         # Validate length and length_unit
@@ -176,14 +177,14 @@ class Cable(PrimaryModel, StatusModel):
             for termination in self.a_terminations:
                 CableEndpoint(
                     cable=self,
-                    cable_end=CableEndpointSideChoices.SIDE_A,
+                    cable_side=CableEndpointSideChoices.SIDE_A,
                     termination=termination
                 ).clean()
 
             for termination in self.b_terminations:
                 CableEndpoint(
                     cable=self,
-                    cable_end=CableEndpointSideChoices.SIDE_Z,
+                    cable_side=CableEndpointSideChoices.SIDE_Z,
                     termination=termination
                 ).clean()
 
@@ -201,8 +202,8 @@ class Cable(PrimaryModel, StatusModel):
         self._pk = self.pk
 
         # Retrieve existing A/B terminations for the Cable
-        a_terminations = {ct.termination: ct for ct in self.endpoints.filter(side=CableEndpointSideChoices.SIDE_A)}  # TODO(mzb) rename to endpoints
-        b_terminations = {ct.termination: ct for ct in self.endpoints.filter(side=CableEndpointSideChoices.SIDE_Z)}
+        a_terminations = {ct.termination: ct for ct in self.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_A)}  # TODO(mzb) rename to endpoints
+        b_terminations = {ct.termination: ct for ct in self.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_Z)}
 
         # Delete stale CableTerminations
         if self._terminations_modified:
@@ -217,10 +218,10 @@ class Cable(PrimaryModel, StatusModel):
         if self._terminations_modified:
             for termination in self.a_terminations:
                 if not termination.present_in_database or termination not in a_terminations:
-                    CableEndpoint(cable=self, side=CableEndpointSideChoices.SIDE_A, termination=termination).save()
+                    CableEndpoint(cable=self, cable_side=CableEndpointSideChoices.SIDE_A, termination=termination).save()
             for termination in self.b_terminations:
                 if not termination.present_in_database or termination not in b_terminations:
-                    CableEndpoint(cable=self, side=CableEndpointSideChoices.SIDE_Z, termination=termination).save()
+                    CableEndpoint(cable=self, cable_side=CableEndpointSideChoices.SIDE_Z, termination=termination).save()
 
         # trace_paths.send(Cable, instance=self, created=_created)  # TODO(mzb)
 
@@ -255,21 +256,17 @@ class CableEndpoint(BaseModel):
         to="dcim.Cable",
         on_delete=models.CASCADE,
         related_name="endpoints",
-        # blank=True, # TODO(mzb)
-        # null=True, # TODO(mzb)
     )
-    side = models.CharField(
+    cable_side = models.CharField(
         max_length=1,
         choices=CableEndpointSideChoices,
-        # blank=True
+        verbose_name="Side",
     )
     termination_type = models.ForeignKey(
         to=ContentType,
         limit_choices_to=CABLE_TERMINATION_MODELS,
         on_delete=models.PROTECT,
         related_name="+",
-        # blank=True, # TODO(mzb)
-        # null=True,  # TODO(mzb)
     )
     termination_id = models.UUIDField(
         # blank=True,
@@ -280,7 +277,7 @@ class CableEndpoint(BaseModel):
     objects = RestrictedQuerySet.as_manager()
 
     class Meta:
-        ordering = ('cable', 'side')
+        ordering = ('cable', 'cable_side')
         unique_together = (('termination_type', 'termination_id'),)  # TODO(mzb) ensure
 
     def __str__(self):
@@ -311,7 +308,7 @@ class CableEndpoint(BaseModel):
         termination_model = self.termination._meta.model
         termination_model.objects.filter(pk=self.termination_id).update(  # TODO(mzb): Caching implications of .update
             cable=self.cable,
-            cable_side=self.side,
+            cable_side=self.cable_side,
         )
 
     def delete(self, *args, **kwargs):
@@ -326,7 +323,7 @@ class CableEndpoint(BaseModel):
 
 
 @extras_features("graphql")
-class CablePath(BaseModel):
+class CablePath(BaseModel):  # TODO(mzb)
     """
     A CablePath instance represents the physical path from an origin to a destination, including all intermediate
     elements in the path. Every instance must specify an `origin`, whereas `destination` may be null (for paths which do

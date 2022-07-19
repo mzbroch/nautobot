@@ -668,17 +668,15 @@ class InterfaceConnectionViewSet(ListModelMixin, GenericViewSet):
 
 
 class CableViewSet(StatusViewSetMixin, ModelViewSet):
-    # queryset = Cable.objects.prefetch_related("status", "termination_a", "termination_b")
-    queryset = Cable.objects.all()
+    queryset = Cable.objects.prefetch_related("endpoints__termination")
     serializer_class = serializers.CableSerializer
     filterset_class = filters.CableFilterSet
 
 
 class CableEndpointViewSet(StatusViewSetMixin, ModelViewSet):
-    # queryset = Cable.objects.prefetch_related("status", "termination_a", "termination_b")
-    queryset = CableEndpoint.objects.all()
+    queryset = Cable.objects.prefetch_related('cable', 'termination')
     serializer_class = serializers.CableEndpointSerializer
-    # filterset_class = filters.CableEndpointFilterSet
+    filterset_class = filters.CableEndpointFilterSet
 
 #
 # Virtual chassis
@@ -718,7 +716,7 @@ class PowerFeedViewSet(PathEndpointMixin, StatusViewSetMixin, CustomFieldModelVi
         "rack",
         "_path__destination",
         "cable",
-        "_cable_peer",
+        "cable__endpoints",
         "status",
         "tags",
     )
@@ -731,7 +729,7 @@ class PowerFeedViewSet(PathEndpointMixin, StatusViewSetMixin, CustomFieldModelVi
 #
 
 
-class ConnectedDeviceViewSet(ViewSet):
+class ConnectedDeviceViewSet(ViewSet):  # TODO(mzb)
     """
     This endpoint allows a user to determine what device (if any) is connected to a given peer device and peer
     interface. This is useful in a situation where a device boots with no configuration, but can detect its neighbors

@@ -339,7 +339,7 @@ class NestedCableEndpointSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="dcim-api:cableendpoint-detail")
     termination_type = ContentTypeField(queryset=ContentType.objects.filter(CABLE_TERMINATION_MODELS))  # -> get
     termination = serializers.SerializerMethodField(read_only=True)
-    side = ChoiceField(choices=CableEndpointSideChoices, allow_blank=False, required=True)
+    cable_side = ChoiceField(choices=CableEndpointSideChoices, allow_blank=False, required=True)
 
     class Meta:
         model = models.CableEndpoint
@@ -349,7 +349,7 @@ class NestedCableEndpointSerializer(BaseModelSerializer):
             "termination_type",
             "termination_id",
             "termination",
-            "side",
+            "cable_side",
         ]
 
     def get_termination(self, obj):

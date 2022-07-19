@@ -3757,7 +3757,7 @@ class CableCSVForm(StatusModelCSVFormMixin, CustomFieldModelCSVForm):
         except ObjectDoesNotExist:
             raise forms.ValidationError(f"{side.upper()} side termination not found: {device} {name}")
 
-        setattr(self.instance, f"termination_{side}", termination_object)
+        setattr(self.instance, f"{side}_endpoints", termination_object)
         return termination_object
 
     def clean_side_a_name(self):
