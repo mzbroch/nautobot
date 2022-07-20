@@ -5,6 +5,8 @@ from nautobot.dcim.models import *
 from nautobot.utilities.forms import DynamicModelChoiceField, DynamicModelMultipleChoiceField
 from nautobot.dcim.forms import CableForm
 
+# TODO(mzb): Fix missing initial values once using cable_add
+
 
 def get_cable_form(a_type, b_type):
 

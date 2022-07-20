@@ -129,6 +129,7 @@ class CableTermination(models.Model):
         related_query_name='%(class)s',
     )
 
+    @property  # TODO(mzb) cached ?
     def cable_peers(self):
         if self.cable:
             peers = self.cable.endpoints.exclude(cable_side=self.cable_side).prefetch_related('termination')

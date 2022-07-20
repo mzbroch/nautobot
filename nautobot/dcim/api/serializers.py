@@ -132,7 +132,7 @@ class CableTerminationSerializer(serializers.ModelSerializer):
     cable_peers_type = serializers.SerializerMethodField(read_only=True)
     cable_peers = serializers.SerializerMethodField(read_only=True)
 
-    # @extend_schema_field(serializers.CharField(allow_null=True))
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_cable_peers_type(self, obj):  # TODO(mzb): decorator
         if not obj.cable:
             return None
@@ -142,8 +142,8 @@ class CableTerminationSerializer(serializers.ModelSerializer):
 
         return None
 
-    # @extend_schema_field(serializers.DictField(allow_null=True))
-    def get_cable_peers(self, obj): # TODO(mzb): decorator
+    @extend_schema_field(serializers.DictField(allow_null=True))
+    def get_cable_peers(self, obj):  # TODO(mzb): decorator
         """
         Return the appropriate serializer for the cable termination model.
         """
@@ -152,6 +152,7 @@ class CableTerminationSerializer(serializers.ModelSerializer):
 
         serializer = get_serializer_for_model(obj.cable_peers[0], prefix="Nested")
         context = {"request": self.context["request"]}
+
         return serializer(obj.cable_peers, context=context, many=True).data
 
 
