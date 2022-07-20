@@ -1013,12 +1013,6 @@ urlpatterns = [
         kwargs={"model": Interface},
     ),
     path(
-        "interfaces/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
-        views.CableCreateView.as_view(),
-        name="interface_connect",
-        kwargs={"termination_a_type": Interface},
-    ),
-    path(
         "devices/interfaces/add/",
         views.DeviceBulkAddInterfaceView.as_view(),
         name="device_bulk_add_interface",
