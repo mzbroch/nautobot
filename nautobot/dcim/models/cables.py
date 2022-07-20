@@ -82,7 +82,7 @@ class Cable(PrimaryModel, StatusModel):
 
     @property
     def termination_b_type(self):
-        termination_b = self.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_Z).first()
+        termination_b = self.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_B).first()
         b_type = termination_b.termination._meta.model if termination_b else None
 
         return b_type
@@ -93,7 +93,7 @@ class Cable(PrimaryModel, StatusModel):
             return self._a_terminations
         # Query self.terminations.all() to leverage cached results
         return [
-            endpoint.termination for endpoint in self.endpoints.all() if endpoint.side == CableEndpointSideChoices.SIDE_A
+            endpoint.termination for endpoint in self.endpoints.all() if endpoint.cable_side == CableEndpointSideChoices.SIDE_A
         ]
 
     @a_terminations.setter
@@ -107,7 +107,7 @@ class Cable(PrimaryModel, StatusModel):
             return self._b_terminations
         # Query self.terminations.all() to leverage cached results
         return [
-            endpoint.termination for endpoint in self.endpoints.all() if endpoint.side == CableEndpointSideChoices.SIDE_Z
+            endpoint.termination for endpoint in self.endpoints.all() if endpoint.cable_side == CableEndpointSideChoices.SIDE_B
         ]
 
     @b_terminations.setter
@@ -184,7 +184,7 @@ class Cable(PrimaryModel, StatusModel):
             for termination in self.b_terminations:
                 CableEndpoint(
                     cable=self,
-                    cable_side=CableEndpointSideChoices.SIDE_Z,
+                    cable_side=CableEndpointSideChoices.SIDE_B,
                     termination=termination
                 ).clean()
 
@@ -203,7 +203,7 @@ class Cable(PrimaryModel, StatusModel):
 
         # Retrieve existing A/B terminations for the Cable
         a_terminations = {ct.termination: ct for ct in self.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_A)}  # TODO(mzb) rename to endpoints
-        b_terminations = {ct.termination: ct for ct in self.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_Z)}
+        b_terminations = {ct.termination: ct for ct in self.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_B)}
 
         # Delete stale CableTerminations
         if self._terminations_modified:
@@ -221,7 +221,7 @@ class Cable(PrimaryModel, StatusModel):
                     CableEndpoint(cable=self, cable_side=CableEndpointSideChoices.SIDE_A, termination=termination).save()
             for termination in self.b_terminations:
                 if not termination.present_in_database or termination not in b_terminations:
-                    CableEndpoint(cable=self, cable_side=CableEndpointSideChoices.SIDE_Z, termination=termination).save()
+                    CableEndpoint(cable=self, cable_side=CableEndpointSideChoices.SIDE_B, termination=termination).save()
 
         # trace_paths.send(Cable, instance=self, created=_created)  # TODO(mzb)
 
@@ -274,6 +274,14 @@ class CableEndpoint(BaseModel):
     )
     termination = GenericForeignKey(ct_field="termination_type", fk_field="termination_id")
 
+    # Cached associations to enable efficient filtering
+    _device = models.ForeignKey(
+        to='dcim.Device',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True
+    )
+
     objects = RestrictedQuerySet.as_manager()
 
     class Meta:
@@ -300,8 +308,8 @@ class CableEndpoint(BaseModel):
 
     def save(self, *args, **kwargs):
 
-        # # Cache objects associated with the terminating object (for filtering)
-        # self.cache_related_objects()
+        # Cache objects associated with the terminating object (for filtering)
+        self.cache_related_objects()
 
         super().save(*args, **kwargs)
 
@@ -320,6 +328,17 @@ class CableEndpoint(BaseModel):
         )
 
         super().delete(*args, **kwargs)
+
+    def cache_related_objects(self):
+        """
+        Cache objects related to the termination (e.g. device, rack, site) directly on the object to
+        enable efficient filtering.
+        """
+        assert self.termination is not None
+
+        # Device components
+        if getattr(self.termination, 'device', None):
+            self._device = self.termination.device
 
 
 @extras_features("graphql")
