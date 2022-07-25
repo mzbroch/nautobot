@@ -19,21 +19,17 @@ from .models import (
 )
 
 
-def create_cablepath(node, rebuild=True):
+def create_cablepath(terminations):
     """
-    Create CablePaths for all paths originating from the specified node.
+    Create CablePaths for all paths originating from the specified set of nodes.
 
-    rebuild (bool) - Used to refresh paths where this node is not an endpoint.
+    :param terminations: Iterable of CableTermination objects
     """
-    cp = CablePath.from_origin(node)
+    from nautobot.dcim.models import CablePath
+
+    cp = CablePath.from_origin(terminations)
     if cp:
-        try:
-            cp.save()
-        except Exception as e:
-            print(node, node.pk)
-            raise e
-    if rebuild:
-        rebuild_paths(node)
+        cp.save()
 
 
 def rebuild_paths(obj):
