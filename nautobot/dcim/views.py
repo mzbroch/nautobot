@@ -2298,15 +2298,6 @@ class CableListView(generic.ObjectListView):
 class CableView(generic.ObjectView):
     queryset = Cable.objects.all()
 
-    # def get_extra_context(self, request, instance):
-    #     a_endpoints = instance.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_A)
-    #     b_endpoints = instance.endpoints.filter(cable_side=CableEndpointSideChoices.SIDE_B)
-    #
-    #     return {
-    #         "a_endpoints": a_endpoints,
-    #         "b_endpoints": b_endpoints,
-    #     }
-
 
 class PathTraceView(generic.ObjectView):
     """
