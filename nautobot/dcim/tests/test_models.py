@@ -4,6 +4,8 @@ from django.contrib.contenttypes.models import ContentType
 
 from nautobot.circuits.models import Circuit, CircuitTermination, CircuitType, Provider, ProviderNetwork
 from nautobot.dcim.choices import (
+    CableStatusChoices,
+    CableTypeChoices,
     DeviceFaceChoices,
     InterfaceTypeChoices,
     PortTypeChoices,
@@ -39,6 +41,60 @@ from nautobot.dcim.models import (
 from nautobot.extras.choices import CustomFieldTypeChoices
 from nautobot.extras.models import CustomField, Status
 from nautobot.tenancy.models import Tenant
+
+
+class CableLengthTestCase(TestCase):
+    def setUp(self):
+        self.site = Site.objects.create(name="Test Site 1", slug="test-site-1")
+        self.manufacturer = Manufacturer.objects.create(name="Test Manufacturer 1", slug="test-manufacturer-1")
+        self.devicetype = DeviceType.objects.create(
+            manufacturer=self.manufacturer,
+            model="Test Device Type 1",
+            slug="test-device-type-1",
+        )
+        self.devicerole = DeviceRole.objects.create(
+            name="Test Device Role 1", slug="test-device-role-1", color="ff0000"
+        )
+        self.device1 = Device.objects.create(
+            device_type=self.devicetype,
+            device_role=self.devicerole,
+            name="TestDevice1",
+            site=self.site,
+        )
+        self.device2 = Device.objects.create(
+            device_type=self.devicetype,
+            device_role=self.devicerole,
+            name="TestDevice2",
+            site=self.site,
+        )
+        self.status = Status.objects.get_for_model(Cable).get(slug="connected")
+
+    def test_cable_validated_save(self):
+        interface1 = Interface.objects.create(device=self.device1, name="eth0")
+        interface2 = Interface.objects.create(device=self.device2, name="eth0")
+        cable = Cable(
+            termination_a=interface1,
+            termination_b=interface2,
+            length_unit="ft",
+            length=1,
+            status=self.status,
+        )
+        cable.validated_save()
+        cable.validated_save()
+
+    def test_cable_full_clean(self):
+        interface3 = Interface.objects.create(device=self.device1, name="eth1")
+        interface4 = Interface.objects.create(device=self.device2, name="eth1")
+        cable = Cable(
+            termination_a=interface3,
+            termination_b=interface4,
+            length_unit="in",
+            length=1,
+            status=self.status,
+        )
+        cable.length = 2
+        cable.save()
+        cable.full_clean()
 
 
 class InterfaceTemplateCustomFieldTestCase(TestCase):
@@ -677,3 +733,31 @@ class CableTestCase(TestCase):
         cable = Cable(termination_a=self.interface2, termination_b=wireless_interface)
         with self.assertRaises(ValidationError):
             cable.clean()
+
+    def test_create_cable_with_missing_status_connected(self):
+        """Test for https://github.com/nautobot/nautobot/issues/2081"""
+        # Delete all cables because some cables has connected status.
+        Cable.objects.all().delete()
+        Status.objects.get(slug=CableStatusChoices.STATUS_CONNECTED).delete()
+        device = Device.objects.first()
+
+        interfaces = (
+            Interface.objects.create(
+                device=device,
+                name="eth-0",
+                type=InterfaceTypeChoices.TYPE_1GE_FIXED,
+            ),
+            Interface.objects.create(
+                device=device,
+                name="eth-1",
+                type=InterfaceTypeChoices.TYPE_1GE_FIXED,
+            ),
+        )
+
+        cable = Cable.objects.create(
+            termination_a=interfaces[0],
+            termination_b=interfaces[1],
+            type=CableTypeChoices.TYPE_CAT6,
+        )
+
+        self.assertTrue(Cable.objects.filter(id=cable.pk).exists())

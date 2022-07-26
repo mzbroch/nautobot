@@ -142,6 +142,13 @@ def get_device_by_name_or_pk(name):
     return device
 
 
+class ConnectCableExcludeIDMixin:
+    def __init__(self, *args, exclude_id=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if exclude_id is not None:
+            self.fields["termination_b_id"].widget.add_query_param("id__n", str(exclude_id))
+
+
 class DeviceComponentFilterForm(BootstrapMixin, CustomFieldFilterForm):
     field_order = ["q", "region", "site"]
     q = forms.CharField(required=False, label="Search")
@@ -1979,6 +1986,12 @@ class DeviceBulkEditForm(
         query_params={"manufacturer_id": "$manufacturer"},
     )
     rack = DynamicModelChoiceField(queryset=Rack.objects.all(), required=False)
+    position = forms.IntegerField(required=False)
+    face = forms.ChoiceField(
+        required=False,
+        choices=add_blank_choice(DeviceFaceChoices),
+        widget=StaticSelect2(),
+    )
     rack_group = DynamicModelChoiceField(queryset=RackGroup.objects.all(), required=False)
     device_role = DynamicModelChoiceField(queryset=DeviceRole.objects.all(), required=False)
     tenant = DynamicModelChoiceField(queryset=Tenant.objects.all(), required=False)
@@ -1992,9 +2005,17 @@ class DeviceBulkEditForm(
             "platform",
             "serial",
             "rack",
+            "position",
+            "face",
             "rack_group",
             "secrets_group",
         ]
+
+    def __init__(self, *args, **kwrags):
+        super().__init__(*args, **kwrags)
+
+        # Disable position because only setting null value is required
+        self.fields["position"].disabled = True
 
 
 class DeviceFilterForm(

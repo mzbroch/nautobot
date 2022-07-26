@@ -134,24 +134,91 @@ Note that a Tag created programmatically via the ORM without assigning any `cont
 
 We've updated the Jinja2 dependency from version 2.11 to version 3.0.3. This may affect the syntax of any `nautobot.extras.models.ComputedField` objects in your database... Specifically, the `template` attribute, which is parsed as a Jinja2 template. Please refer to [Jinja2 3.0.x's release notes](https://jinja.palletsprojects.com/en/3.0.x/changes/) to check if any changes might be required in your computed fields' templates.
 
+#### Virtual Chassis Master Device Interfaces List
+
+The device column will now show on a device's interfaces list if this device is the master in a virtual chassis. And will conversely not appear if the device is not a master on a virtual chassis.
+
+It is no longer possible to connect an interface to itself in the cable connect form.
+
 ### Removed
 
 #### Python 3.6 No Longer Supported ([#1268](https://github.com/nautobot/nautobot/issues/1268))
 
 As Python 3.6 has reached end-of-life, and many of Nautobot's dependencies have already dropped support for Python 3.6 as a consequence, Nautobot 1.3 and later do not support installation under Python 3.6.
 
-## v1.3.7 (2022-MM-DD)
+## v1.3.9 (2022-07-25)
 
 ### Added
 
+- [#860](https://github.com/nautobot/nautobot/issues/860) - Added documentation that adding device component to device type does not modify existing device instances
+- [#1595](https://github.com/nautobot/nautobot/issues/1595) - Add ability to specify uWSGI buffer size via environment variable.
+- [#1757](https://github.com/nautobot/nautobot/issues/1757) - Added nullable face, position to Device bulk edit form to provided desired behavior to bulk assigning to a new rack.
+
 ### Changed
 
-- [#1645](https://github.com/nautobot/nautobot/issues/1645) - Hide Search Bar if No AuthN and hide_restricted_ui is True
+- [#386](https://github.com/nautobot/nautobot/issues/386) - Clarified messaging in API for rack position occupied.
+- [#1356](https://github.com/nautobot/nautobot/issues/1356) - Virtual chassis master device interface list is less confusing.
+- [#2045](https://github.com/nautobot/nautobot/pull/2045) - Clarified Job authoring around proper class inheritance.
 
 ### Fixed
 
-- [#1677](https://github.com/nautobot/nautobot/issues/1677) - Fixed nested CustomFields (ex: on Interface) default value not applying upon Device creation.
-- [#1769](https://github.com/nautobot/nautobot/issues/1769) - Resolve missing menu 'General / Installed Plugins' in navbar if HIDE RESTRICTED UI is activated
+- [#1035](https://github.com/nautobot/nautobot/issues/1035) - Fix assertion raised if SLAAC Status is missing when creating `IPAddress` objects
+- [#1694](https://github.com/nautobot/nautobot/issues/1694) - Fixed CablePath not found error when disconnects/delete action performed on a cable
+- [#1795](https://github.com/nautobot/nautobot/issues/1795) - Corrected relationship source/destination filter help text from queryset Filter to filterset Filter and updated documentations.
+- [#1839](https://github.com/nautobot/nautobot/issues/1795) - Fixed staff users with auth > group permissions unable to view groups in admin UI.
+- [#1937](https://github.com/nautobot/nautobot/issues/1937) - Solved _custom_field_data do not fully delete when using CustomFieldBulkDeleteView.
+- [#1947](https://github.com/nautobot/nautobot/issues/1947) - Fixed unbound local error by initializing template variable before conditional logic statements.
+- [#2036](https://github.com/nautobot/nautobot/pull/2036) - Fixed outdated UI navigation references in documentation.
+- [#2039](https://github.com/nautobot/nautobot/issues/2039) - Fixed IntegerVar with default set to 0 on Job evaluating to False.
+- [#2057](https://github.com/nautobot/nautobot/issues/2057) - Fixed RIR changelog route being in VRF name prefix.
+- [#2077](https://github.com/nautobot/nautobot/issues/2077) - Fixed an error when viewing object detail pages after uninstalling a plugin but still having RelationshipAssociations involving the plugin's models.
+- [#2081](https://github.com/nautobot/nautobot/issues/2081) - Fixed error raised if status connected not found when creating a cable
+
+## v1.3.8 (2022-07-11)
+
+### Added
+
+- [#1464](https://github.com/nautobot/nautobot/issues/1464) - Added "Continue with SSO" link on login page.
+
+### Changed
+
+- [#1407](https://github.com/nautobot/nautobot/issues/1407) - Changed custom field export column headings to prefix with `cf_`.
+- [#1603](https://github.com/nautobot/nautobot/issues/1603) - Changed GraphQL schema generation to call time for GraphQL API.
+- [#1977](https://github.com/nautobot/nautobot/pull/1977) - Updated Renovate config to batch updates (additional PRs included to further refine config).
+- [#2020](https://github.com/nautobot/nautobot/pull/2020) - Updated `celery >= 5.2.7`, `django-jinja  >= 2.10.2`, and `mysqlclient >= 2.1.1` versions in lock file (patch updates).
+
+### Fixed
+
+- [#1838](https://github.com/nautobot/nautobot/issues/1838) - Fixed job result to show latest not oldest.
+- [#1874](https://github.com/nautobot/nautobot/issues/1874) - Fixed Git repo sync issue with Sentinel with deprecated rq_count check.
+
+### Security
+
+!!! important
+    CVE in Django versions `>= 3.2, < 3.2.14`. This update upgrades Django to `3.2.14`.
+
+- [#2004](https://github.com/nautobot/nautobot/pull/2004) - Bump Django from 3.2.13 to 3.2.14 for for [CVE-2022-34265](https://github.com/advisories/GHSA-p64x-8rxx-wf6q).
+
+## v1.3.7 (2022-06-27)
+
+### Added
+
+- [#1896](https://github.com/nautobot/nautobot/pull/1856) - Added Renovate Bot configuration, targeting `next`.
+- [#1900](https://github.com/nautobot/nautobot/issues/1900) - Added ability to filter Git repository table based on provided contents.
+
+### Changed
+
+- [#1645](https://github.com/nautobot/nautobot/issues/1645) - Hide search bar for unauthenticated users if `HIDE_RESTRICTED_UI` is True
+- [#1946](https://github.com/nautobot/nautobot/pull/1946) - Increase character limit on `FileAttachment.mimetype` to 255 to allow for all mime types to be used.
+- [#1948](https://github.com/nautobot/nautobot/issues/1948) - Switched Renovate Bot configuration to bump lock-file only on patch releases instead of bumping in `pyproject.toml`.
+
+### Fixed
+
+- [#1677](https://github.com/nautobot/nautobot/issues/1677) - Fixed default values of custom fields on device components (such as Interface) not being applied upon Device creation.
+- [#1769](https://github.com/nautobot/nautobot/issues/1769) - Resolve missing menu 'General / Installed Plugins' in navbar if `HIDE_RESTRICTED_UI` is activated
+- [#1836](https://github.com/nautobot/nautobot/issues/1836) - Fixed incorrect pre-population of custom field filters in table views.
+- [#1870](https://github.com/nautobot/nautobot/issues/1870) - Fixed cable `_abs_length` validation error.
+- [#1941](https://github.com/nautobot/nautobot/pull/1941) - Fixes uWSGI config example, development environment links in Docker section of docs.
 
 ## v1.3.6 (2022-06-13)
 
