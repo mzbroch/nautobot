@@ -120,7 +120,7 @@ def clear_virtualchassis_members(instance, **kwargs):
 #
 
 
-@receiver(trace_paths, sender=CableEndpoint)
+@receiver(trace_paths, sender=Cable)
 def update_connected_endpoints(instance, created, raw=False, **kwargs):
     """
     When a Cable is saved, check for and update its two connected endpoints
@@ -129,7 +129,6 @@ def update_connected_endpoints(instance, created, raw=False, **kwargs):
     if raw:
         logger.debug(f"Skipping endpoint updates for imported cable {instance}")
         return
-
     # Update cable paths if new terminations have been set
     if instance._terminations_modified:
         a_terminations = []
