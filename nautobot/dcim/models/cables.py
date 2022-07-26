@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import Sum
 from django.urls import reverse
 from django.utils.functional import classproperty
+from django.dispatch import Signal
 
 from nautobot.dcim.choices import CableLengthUnitChoices, CableTypeChoices, CableEndpointSideChoices
 from nautobot.dcim.constants import CABLE_TERMINATION_MODELS, COMPATIBLE_TERMINATION_TYPES, NONCONNECTABLE_IFACE_TYPES
@@ -33,6 +34,8 @@ __all__ = (
     "CablePath",
 )
 
+
+trace_paths = Signal()
 
 #
 # Cables
@@ -190,6 +193,7 @@ class Cable(PrimaryModel, StatusModel):
                 ).clean()
 
     def save(self, *args, **kwargs):
+        is_new = not self.present_in_database
 
         # Store the given length (if any) in meters for use in database ordering
         if self.length and self.length_unit:
@@ -224,7 +228,7 @@ class Cable(PrimaryModel, StatusModel):
                 if not termination.present_in_database or termination not in b_terminations:
                     CableEndpoint(cable=self, cable_side=CableEndpointSideChoices.SIDE_B, termination=termination).save()
 
-        # trace_paths.send(Cable, instance=self, created=_created)  # TODO(mzb)
+        trace_paths.send(Cable, instance=self, created=is_new)
 
     def to_csv(self):
         return (
@@ -455,7 +459,7 @@ class CablePath(BaseModel):  # TODO(mzb)
         """
         from nautobot.circuits.models import CircuitTermination
 
-        # Ensure all originating endpoints are attached to the same termination
+        # Ensure all originating terminations are attached to the same cable
         if len(terminations) > 1:
             assert all(t.cable == terminations[0].cable for t in terminations[1:])
 
@@ -491,29 +495,25 @@ class CablePath(BaseModel):  # TODO(mzb)
                 break
             assert type(cable) in (Cable,)
 
-            # Step 3: Record the link and update path status if not "connected"
+            # Step 3: Record the cable and update path status if not "connected"
             path.append([object_to_path_node(cable)])
             if hasattr(cable, 'status') and cable.status != CableStatusChoices.STATUS_CONNECTED:
                 is_active = False
 
             # Step 4: Determine the far-end terminations
-            if True: #isinstance(cable, Cable):
-                termination_type = ContentType.objects.get_for_model(terminations[0])
-                local_cable_terminations = CableEndpoint.objects.filter(
-                    termination_type=termination_type,
-                    termination_id__in=[t.pk for t in terminations]
-                )
-                # Terminations must all belong to same end of Cable
-                local_cable_end = local_cable_terminations[0].cable_side
-                assert all(ct.cable_side == local_cable_end for ct in local_cable_terminations[1:])
-                remote_cable_terminations = CableEndpoint.objects.filter(
-                    cable=cable,
-                    cable_end='A' if local_cable_end == 'B' else 'B'
-                )
-                remote_terminations = [ct.termination for ct in remote_cable_terminations]
-            # else:
-            #     # WirelessLink
-            #     remote_terminations = [cable.interface_b] if link.interface_a is terminations[0] else [link.interface_a]
+            termination_type = ContentType.objects.get_for_model(terminations[0])
+            local_cable_endpoints = CableEndpoint.objects.filter(
+                termination_type=termination_type,
+                termination_id__in=[t.pk for t in terminations]
+            )
+            # Endpoints must all belong to same side of Cable
+            local_cable_side = local_cable_endpoints[0].cable_side
+            assert all(ct.cable_side == local_cable_side for ct in local_cable_endpoints[1:])
+            remote_cable_endpoints = CableEndpoint.objects.filter(
+                cable=cable,
+                cable_side='A' if local_cable_side == 'B' else 'B'
+            )
+            remote_terminations = [ct.termination for ct in remote_cable_endpoints]
 
             # Step 5: Record the far-end termination object(s)
             path.append([
@@ -670,150 +670,3 @@ class CablePath(BaseModel):  # TODO(mzb)
         rearport = path_node_to_object(self._nodes[-1])
 
         return FrontPort.objects.filter(rear_port=rearport)
-
-    # def __str__(self):
-    #     status = " (active)" if self.is_active else " (split)" if self.is_split else ""
-    #     return f"Path #{self.pk}: {self.origin} to {self.destination} via {len(self.path)} nodes{status}"
-    #
-    # def save(self, *args, **kwargs):
-    #     super().save(*args, **kwargs)
-    #
-    #     # Record a direct reference to this CablePath on its originating object
-    #     model = self.origin._meta.model
-    #     model.objects.filter(pk=self.origin.pk).update(_path=self.pk)
-    #
-    # @property
-    # def segment_count(self):
-    #     total_length = 1 + len(self.path) + (1 if self.destination else 0)
-    #     return int(total_length / 3)
-    #
-    # @classmethod
-    # def from_origin(cls, origin):
-    #     """
-    #     Create a new CablePath instance as traced from the given path origin.
-    #     """
-    #     if origin is None or origin.cable is None:
-    #         return None
-    #
-    #     # Import added here to avoid circular imports with Cable.
-    #     from nautobot.circuits.models import CircuitTermination
-    #
-    #     destination = None
-    #     path = []
-    #     position_stack = []
-    #     is_active = True
-    #     is_split = False
-    #
-    #     node = origin
-    #     visited_nodes = set()
-    #     while node.cable is not None:
-    #         if node.id in visited_nodes:
-    #             raise ValidationError("a loop is detected in the path")
-    #         visited_nodes.add(node.id)
-    #         if node.cable.status != Cable.STATUS_CONNECTED:
-    #             is_active = False
-    #
-    #         # Follow the cable to its far-end termination
-    #         path.append(object_to_path_node(node.cable))
-    #         peer_termination = node.get_cable_peer()
-    #
-    #         # Follow a FrontPort to its corresponding RearPort
-    #         if isinstance(peer_termination, FrontPort):
-    #             path.append(object_to_path_node(peer_termination))
-    #             node = peer_termination.rear_port
-    #             if node.positions > 1:
-    #                 position_stack.append(peer_termination.rear_port_position)
-    #             path.append(object_to_path_node(node))
-    #
-    #         # Follow a RearPort to its corresponding FrontPort (if any)
-    #         elif isinstance(peer_termination, RearPort):
-    #             path.append(object_to_path_node(peer_termination))
-    #
-    #             # Determine the peer FrontPort's position
-    #             if peer_termination.positions == 1:
-    #                 position = 1
-    #             elif position_stack:
-    #                 position = position_stack.pop()
-    #             else:
-    #                 # No position indicated: path has split, so we stop at the RearPort
-    #                 is_split = True
-    #                 break
-    #
-    #             try:
-    #                 node = FrontPort.objects.get(rear_port=peer_termination, rear_port_position=position)
-    #                 path.append(object_to_path_node(node))
-    #             except ObjectDoesNotExist:
-    #                 # No corresponding FrontPort found for the RearPort
-    #                 break
-    #
-    #         # Follow a Circuit Termination if there is a corresponding Circuit Termination
-    #         # Side A and Side Z exist
-    #         elif isinstance(peer_termination, CircuitTermination):
-    #             node = peer_termination.get_peer_termination()
-    #             # A Circuit Termination does not require a peer.
-    #             if node is None:
-    #                 destination = peer_termination
-    #                 break
-    #             path.append(object_to_path_node(peer_termination))
-    #             path.append(object_to_path_node(node))
-    #
-    #         # Anything else marks the end of the path
-    #         else:
-    #             destination = peer_termination
-    #             break
-    #
-    #     if destination is None:
-    #         is_active = False
-    #
-    #     return cls(
-    #         origin=origin,
-    #         destination=destination,
-    #         path=path,
-    #         is_active=is_active,
-    #         is_split=is_split,
-    #     )
-    #
-    # def get_path(self):
-    #     """
-    #     Return the path as a list of prefetched objects.
-    #     """
-    #     # Compile a list of IDs to prefetch for each type of model in the path
-    #     to_prefetch = defaultdict(list)
-    #     for node in self.path:
-    #         ct_id, object_id = decompile_path_node(node)
-    #         to_prefetch[ct_id].append(object_id)
-    #
-    #     # Prefetch path objects using one query per model type. Prefetch related devices where appropriate.
-    #     prefetched = {}
-    #     for ct_id, object_ids in to_prefetch.items():
-    #         model_class = ContentType.objects.get_for_id(ct_id).model_class()
-    #         queryset = model_class.objects.filter(pk__in=object_ids)
-    #         if hasattr(model_class, "device"):
-    #             queryset = queryset.prefetch_related("device")
-    #         prefetched[ct_id] = {obj.id: obj for obj in queryset}
-    #
-    #     # Replicate the path using the prefetched objects.
-    #     path = []
-    #     for node in self.path:
-    #         ct_id, object_id = decompile_path_node(node)
-    #         path.append(prefetched[ct_id][object_id])
-    #
-    #     return path
-    #
-    # def get_total_length(self):
-    #     """
-    #     Return the sum of the length of each cable in the path.
-    #     """
-    #     cable_ids = [
-    #         # Starting from the first element, every third element in the path should be a Cable
-    #         decompile_path_node(self.path[i])[1]
-    #         for i in range(0, len(self.path), 3)
-    #     ]
-    #     return Cable.objects.filter(id__in=cable_ids).aggregate(total=Sum("_abs_length"))["total"]
-    #
-    # def get_split_nodes(self):
-    #     """
-    #     Return all available next segments in a split cable path.
-    #     """
-    #     rearport = path_node_to_object(self.path[-1])
-    #     return FrontPort.objects.filter(rear_port=rearport)
