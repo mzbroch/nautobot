@@ -23,14 +23,6 @@ def get_cable_form(a_type, b_type):
                         'sites': f'$termination_{cable_end}_site'
                     }
                 )
-                # attrs[f'termination_{cable_end}_sitegroup'] = DynamicModelChoiceField(
-                #     queryset=SiteGroup.objects.all(),
-                #     label='Site group',
-                #     required=False,
-                #     initial_params={
-                #         'sites': f'$termination_{cable_end}_site'
-                #     }
-                # )
                 attrs[f'termination_{cable_end}_site'] = DynamicModelChoiceField(
                     queryset=Site.objects.all(),
                     label='Site',
@@ -39,15 +31,6 @@ def get_cable_form(a_type, b_type):
                         'region_id': f'$termination_{cable_end}_region',
                     }
                 )
-                # attrs[f'termination_{cable_end}_location'] = DynamicModelChoiceField(
-                #     queryset=Location.objects.all(),
-                #     label='Location',
-                #     required=False,
-                #     null_option='None',
-                #     query_params={
-                #         'site_id': f'$termination_{cable_end}_site'
-                #     }
-                # )
 
                 # Device component
                 if hasattr(term_cls, 'device'):
