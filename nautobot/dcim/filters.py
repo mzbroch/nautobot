@@ -18,9 +18,11 @@ from nautobot.tenancy.models import Tenant
 from nautobot.utilities.choices import ColorChoices
 from nautobot.utilities.filters import (
     BaseFilterSet,
+    ContentTypeFilter,
     ContentTypeMultipleChoiceFilter,
     MultiValueCharFilter,
     MultiValueMACAddressFilter,
+    MultiValueNumberFilter,
     MultiValueUUIDFilter,
     NameSlugSearchFilterSet,
     NaturalKeyOrPKMultipleChoiceFilter,
@@ -42,6 +44,7 @@ from .choices import (
 from .constants import NONCONNECTABLE_IFACE_TYPES, VIRTUAL_IFACE_TYPES, WIRELESS_IFACE_TYPES
 from .models import (
     Cable,
+    CableEndpoint,
     ConsolePort,
     ConsolePortTemplate,
     ConsoleServerPort,
@@ -80,6 +83,7 @@ from .models import (
 
 __all__ = (
     "CableFilterSet",
+    "CableEndpointFilterSet",
     "CableTerminationFilterSet",
     "ConsoleConnectionFilterSet",
     "ConsolePortFilterSet",
@@ -1091,8 +1095,15 @@ class DeviceComponentFilterSet(CustomFieldModelFilterSet):
     tag = TagFilter()
 
 
+class CableEndpointFilterSet(BaseFilterSet):
+
+    class Meta:
+        model = CableEndpoint
+        fields = ['id', 'cable', 'cable_side', 'termination_type', 'termination_id']
+
+
 # TODO: should be CableTerminationFilterSetMixin
-class CableTerminationFilterSet(django_filters.FilterSet):
+class CableTerminationFilterSet(django_filters.FilterSet):  # TODO(mzb)
     cabled = django_filters.BooleanFilter(field_name="cable", lookup_expr="isnull", exclude=True)
     cable = django_filters.ModelMultipleChoiceFilter(
         queryset=Cable.objects.all(),
@@ -1121,7 +1132,7 @@ class ConsolePortFilterSet(
 
     class Meta:
         model = ConsolePort
-        fields = ["id", "name", "description", "label"]
+        fields = ["id", "name", "description", "label", "cable_side"]
 
 
 class ConsoleServerPortFilterSet(
@@ -1134,7 +1145,7 @@ class ConsoleServerPortFilterSet(
 
     class Meta:
         model = ConsoleServerPort
-        fields = ["id", "name", "description", "label"]
+        fields = ["id", "name", "description", "label", "cable_side"]
 
 
 class PowerPortFilterSet(
@@ -1157,7 +1168,7 @@ class PowerPortFilterSet(
 
     class Meta:
         model = PowerPort
-        fields = ["id", "name", "maximum_draw", "allocated_draw", "description", "label"]
+        fields = ["id", "name", "maximum_draw", "allocated_draw", "description", "label", "cable_side"]
 
 
 class PowerOutletFilterSet(
@@ -1175,7 +1186,7 @@ class PowerOutletFilterSet(
 
     class Meta:
         model = PowerOutlet
-        fields = ["id", "name", "feed_leg", "description", "label"]
+        fields = ["id", "name", "feed_leg", "description", "label", "cable_side"]
 
 
 class InterfaceFilterSet(
@@ -1285,6 +1296,7 @@ class InterfaceFilterSet(
             "mode",
             "description",
             "label",
+            "cable_side",
         ]
 
     def filter_device(self, queryset, name, value):
@@ -1347,7 +1359,7 @@ class FrontPortFilterSet(BaseFilterSet, DeviceComponentFilterSet, CableTerminati
 
     class Meta:
         model = FrontPort
-        fields = ["id", "name", "type", "description", "label", "rear_port_position"]
+        fields = ["id", "name", "type", "description", "label", "rear_port_position", "cable_side"]
 
 
 class RearPortFilterSet(BaseFilterSet, DeviceComponentFilterSet, CableTerminationFilterSet):
@@ -1364,7 +1376,7 @@ class RearPortFilterSet(BaseFilterSet, DeviceComponentFilterSet, CableTerminatio
 
     class Meta:
         model = RearPort
-        fields = ["id", "name", "type", "positions", "description", "label"]
+        fields = ["id", "name", "type", "positions", "description", "label", "cable_side"]
 
 
 class DeviceBayFilterSet(BaseFilterSet, DeviceComponentFilterSet):
@@ -1529,24 +1541,28 @@ class VirtualChassisFilterSet(NautobotFilterSet):
 
 class CableFilterSet(NautobotFilterSet, StatusModelFilterSetMixin):
     q = SearchFilter(filter_predicates={"label": "icontains"})
+    termination_a_type = ContentTypeFilter(
+        field_name='endpoints__termination_type'
+    )
+    termination_a_id = MultiValueNumberFilter(
+        field_name='endpoints__termination_id'
+    )
+    termination_b_type = ContentTypeFilter(
+        field_name='endpoints__termination_type'
+    )
+    termination_b_id = MultiValueNumberFilter(
+        field_name='endpoints__termination_id'
+    )
     type = django_filters.MultipleChoiceFilter(choices=CableTypeChoices)
     color = django_filters.MultipleChoiceFilter(choices=ColorChoices)
-    device_id = MultiValueUUIDFilter(method="filter_device", label="Device (ID)")
-    device = MultiValueCharFilter(method="filter_device", field_name="device__name", label="Device (name)")
-    rack_id = MultiValueUUIDFilter(method="filter_device", field_name="device__rack_id", label="Rack (ID)")
-    rack = MultiValueCharFilter(method="filter_device", field_name="device__rack__name", label="Rack (name)")
-    site_id = MultiValueUUIDFilter(method="filter_device", field_name="device__site_id", label="Site (ID)")
-    site = MultiValueCharFilter(method="filter_device", field_name="device__site__slug", label="Site (name)")
-    tenant_id = MultiValueUUIDFilter(method="filter_device", field_name="device__tenant_id", label="Tenant (ID)")
-    tenant = MultiValueCharFilter(method="filter_device", field_name="device__tenant__slug", label="Tenant (name)")
-    termination_a_type = ContentTypeMultipleChoiceFilter(
-        choices=FeatureQuery("cable_terminations").get_choices,
-        conjoined=False,
-    )
-    termination_b_type = ContentTypeMultipleChoiceFilter(
-        choices=FeatureQuery("cable_terminations").get_choices,
-        conjoined=False,
-    )
+    device_id = MultiValueUUIDFilter(method="filter_by_termination", label="Device (ID)")
+    device = MultiValueCharFilter(method="filter_by_termination", field_name="device__name", label="Device (name)")
+    rack_id = MultiValueUUIDFilter(method="filter_by_termination", field_name="rack_id", label="Rack (ID)")
+    rack = MultiValueCharFilter(method="filter_by_termination", field_name="rack__name", label="Rack (name)")
+    site_id = MultiValueUUIDFilter(method="filter_by_termination", field_name="site_id", label="Site (ID)")
+    site = MultiValueCharFilter(method="filter_by_termination", field_name="site__slug", label="Site (name)")
+    tenant_id = MultiValueUUIDFilter(method="filter_by_termination", field_name="device__tenant_id", label="Tenant (ID)")
+    tenant = MultiValueCharFilter(method="filter_by_termination", field_name="device__tenant__slug", label="Tenant (name)")
     tag = TagFilter()
 
     class Meta:
@@ -1556,15 +1572,12 @@ class CableFilterSet(NautobotFilterSet, StatusModelFilterSetMixin):
             "label",
             "length",
             "length_unit",
-            "termination_a_id",
-            "termination_b_id",
         ]
 
-    def filter_device(self, queryset, name, value):
-        queryset = queryset.filter(
-            Q(**{"_termination_a_{}__in".format(name): value}) | Q(**{"_termination_b_{}__in".format(name): value})
-        )
-        return queryset
+    def filter_by_termination(self, queryset, name, value):
+        # Filter by a related object cached on CableTermination. Note the underscore preceding the field name.
+        # Supported objects: device, rack, location, site
+        return queryset.filter(**{f'terminations___{name}__in': value}).distinct()
 
 
 # TODO: should be ConnectionFilterSetMixin
@@ -1707,4 +1720,5 @@ class PowerFeedFilterSet(
             "max_utilization",
             "comments",
             "available_power",
+            "cable_side",
         ]
