@@ -1,6 +1,6 @@
 from django.urls import path
 
-from nautobot.dcim.views import CableCreateView, PathTraceView
+from nautobot.dcim.views import PathTraceView
 from nautobot.extras.views import ObjectChangeLogView, ObjectNotesView
 from . import views
 from .models import Circuit, CircuitTermination, CircuitType, Provider, ProviderNetwork
@@ -169,12 +169,13 @@ urlpatterns = [
         views.CircuitTerminationDeleteView.as_view(),
         name="circuittermination_delete",
     ),
-    path(
-        "circuit-terminations/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
-        CableCreateView.as_view(),
-        name="circuittermination_connect",
-        kwargs={"termination_a_type": CircuitTermination},
-    ),
+    # TODO(mzb)
+    # path(
+    #     "circuit-terminations/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
+    #     CableCreateView.as_view(),
+    #     name="circuittermination_connect",
+    #     kwargs={"termination_a_type": CircuitTermination},
+    # ),
     path(
         "circuit-terminations/<uuid:pk>/trace/",
         PathTraceView.as_view(),

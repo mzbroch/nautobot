@@ -870,12 +870,6 @@ urlpatterns = [
         kwargs={"model": ConsolePort},
     ),
     path(
-        "console-ports/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
-        views.CableCreateView.as_view(),
-        name="consoleport_connect",
-        kwargs={"termination_a_type": ConsolePort},
-    ),
-    path(
         "devices/console-ports/add/",
         views.DeviceBulkAddConsolePortView.as_view(),
         name="device_bulk_add_consoleport",
@@ -950,12 +944,6 @@ urlpatterns = [
         kwargs={"model": ConsoleServerPort},
     ),
     path(
-        "console-server-ports/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
-        views.CableCreateView.as_view(),
-        name="consoleserverport_connect",
-        kwargs={"termination_a_type": ConsoleServerPort},
-    ),
-    path(
         "devices/console-server-ports/add/",
         views.DeviceBulkAddConsoleServerPortView.as_view(),
         name="device_bulk_add_consoleserverport",
@@ -1016,12 +1004,6 @@ urlpatterns = [
         views.PathTraceView.as_view(),
         name="powerport_trace",
         kwargs={"model": PowerPort},
-    ),
-    path(
-        "power-ports/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
-        views.CableCreateView.as_view(),
-        name="powerport_connect",
-        kwargs={"termination_a_type": PowerPort},
     ),
     path(
         "devices/power-ports/add/",
@@ -1090,12 +1072,6 @@ urlpatterns = [
         kwargs={"model": PowerOutlet},
     ),
     path(
-        "power-outlets/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
-        views.CableCreateView.as_view(),
-        name="poweroutlet_connect",
-        kwargs={"termination_a_type": PowerOutlet},
-    ),
-    path(
         "devices/power-outlets/add/",
         views.DeviceBulkAddPowerOutletView.as_view(),
         name="device_bulk_add_poweroutlet",
@@ -1156,12 +1132,6 @@ urlpatterns = [
         views.PathTraceView.as_view(),
         name="interface_trace",
         kwargs={"model": Interface},
-    ),
-    path(
-        "interfaces/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
-        views.CableCreateView.as_view(),
-        name="interface_connect",
-        kwargs={"termination_a_type": Interface},
     ),
     path(
         "devices/interfaces/add/",
@@ -1225,12 +1195,6 @@ urlpatterns = [
         name="frontport_trace",
         kwargs={"model": FrontPort},
     ),
-    path(
-        "front-ports/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
-        views.CableCreateView.as_view(),
-        name="frontport_connect",
-        kwargs={"termination_a_type": FrontPort},
-    ),
     # path('devices/front-ports/add/', views.DeviceBulkAddFrontPortView.as_view(), name='device_bulk_add_frontport'),
     # Rear ports
     path("rear-ports/", views.RearPortListView.as_view(), name="rearport_list"),
@@ -1288,12 +1252,6 @@ urlpatterns = [
         views.PathTraceView.as_view(),
         name="rearport_trace",
         kwargs={"model": RearPort},
-    ),
-    path(
-        "rear-ports/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
-        views.CableCreateView.as_view(),
-        name="rearport_connect",
-        kwargs={"termination_a_type": RearPort},
     ),
     path(
         "devices/rear-ports/add/",
@@ -1426,6 +1384,7 @@ urlpatterns = [
     ),
     # Cables
     path("cables/", views.CableListView.as_view(), name="cable_list"),
+    path('cables/add/', views.CableEditView.as_view(), name='cable_add'),
     path("cables/import/", views.CableBulkImportView.as_view(), name="cable_import"),
     path("cables/edit/", views.CableBulkEditView.as_view(), name="cable_bulk_edit"),
     path("cables/delete/", views.CableBulkDeleteView.as_view(), name="cable_bulk_delete"),
@@ -1610,11 +1569,5 @@ urlpatterns = [
         ObjectNotesView.as_view(),
         name="powerfeed_notes",
         kwargs={"model": PowerFeed},
-    ),
-    path(
-        "power-feeds/<uuid:termination_a_id>/connect/<str:termination_b_type>/",
-        views.CableCreateView.as_view(),
-        name="powerfeed_connect",
-        kwargs={"termination_a_type": PowerFeed},
     ),
 ]
